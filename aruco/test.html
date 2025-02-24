@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <style>
+        body {
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .canv {
+            width: 20cm;
+            height: 20cm;
+            position: relative;
+        }
+
+        .canv div {
+            width: 1cm;
+            height: 1cm;
+            position: absolute;
+        }
+
+        .canv div img {
+            width: 100%;
+            height: 100%;
+        }
+
+        .ar0 {
+            top: 0;
+            left: 0;
+        }
+
+        .ar1 {
+            top: 3cm;
+            left: 15cm;
+        }
+
+        .ar2 {
+            top: 18cm;
+            left: 3cm;
+        }
+
+        .ar3 {
+            top: 19cm;
+            left: 18cm;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="canv">
+        <div class="ar0">
+            <img src="./aruco_0.png" alt="">
+        </div>
+        <div class="ar1">
+            <img src="./aruco_1.png" alt="">
+        </div>
+        <div class="ar2">
+            <img src="./aruco_2.png" alt="">
+        </div>
+        <div class="ar3">
+            <img src="./aruco_3.png" alt="">
+        </div>
+    </div>
+
+</body>
+
+</html>
