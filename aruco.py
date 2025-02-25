@@ -328,7 +328,7 @@ def getPosition(img, mtx, dist, aruco_positions: dict[int, Aruco]):
     :param object_points: The 3D object points
     :return: The rotation and translation
     """
-    arucos, rejected = detectAruco(img)
+    arucos, rejected = detectAruco(img, debug=True)
     final_image_points = []
     final_obj_points = []
 
@@ -361,15 +361,15 @@ if __name__ == "__main__":
 
     # This is the positions of the aruco markers in the 3d world
     aruco_positions: dict[int, Aruco] = {
-        # 0: aruco(0, Position(0, 0, 0)),
-        # 1: aruco(1, Position(15, 3, 0)),
-        # 2: aruco(2, Position(3, 18, 0)),
+        0: Aruco(0, Position(0, 0, 0)),
+        1: Aruco(1, Position(15, 3, 0)),
+        2: Aruco(2, Position(3, 18, 0)),
         3: Aruco(3, Position(18, 19, 0)),
     }
 
     mtx, dist = loadCalibration("./calibration/calibration.npz")
 
-    rvec, tvec = getPosition("./loca/0.jpg", mtx, dist, aruco_positions)
+    rvec, tvec = getPosition(cv.imread("./loca/1.jpg"), mtx, dist, aruco_positions)
     R, _ = cv.Rodrigues(rvec)
     camera_position = -R.T @ tvec
     plot_camera_pose([camera_position], [R], aruco_positions.values())
