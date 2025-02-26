@@ -14,6 +14,9 @@ class Position(Point):
         super().__init__(x, y)
         self.z = z
 
+    def __str__(self):
+        return f"({self.x}, {self.y}, {self.z})"
+
 
 class Aruco:
     corners: list[Position]
@@ -27,6 +30,16 @@ class Aruco:
             Position(topLeft.x, topLeft.y + size, topLeft.z),
         ]
         self.size = size
+
+    def getCornersAsList(self):
+        return np.array(
+            [
+                [self.corners[0].x, self.corners[0].y, self.corners[0].z],
+                [self.corners[1].x, self.corners[1].y, self.corners[1].z],
+                [self.corners[2].x, self.corners[2].y, self.corners[2].z],
+                [self.corners[3].x, self.corners[3].y, self.corners[3].z],
+            ]
+        )
 
 
 def generate_aruco_marker(
@@ -59,9 +72,7 @@ def generate_aruco_marker(
     return marker_image
 
 
-def calibrateCamera(
-    images, pointsToFind=(7, 7), filepath="./calibration/calibration.npz"
-):
+def calibrateCamera(images, pointsToFind=(7, 7), filepath=None):
     """
     Calibrate the camera using a set of images of a chessboard pattern.
 
@@ -83,8 +94,7 @@ def calibrateCamera(
     imgpoints = []  # 2d points in image plane.
 
     print("Starting calibration, this may take some time...")
-    for i, fname in enumerate(images):
-        img = cv.imread(fname)
+    for i, img in enumerate(images):
         gray = cv.cvtColor(img, cv.COLOR_BGR2GRAY)
 
         # Find the chess board corners
@@ -99,8 +109,7 @@ def calibrateCamera(
             imgpoints.append(corners)
 
             # Draw and display the corners
-            img = cv.drawChessboardCorners(img, pointsToFind, corners2, ret)
-    cv.destroyAllWindows()
+            # img = cv.drawChessboardCorners(img, pointsToFind, corners2, ret)
 
     ret, mtx, dist, rvecs, tvecs = cv.calibrateCamera(
         objpoints, imgpoints, gray.shape[::-1], None, None
@@ -118,10 +127,9 @@ def calibrateCamera(
         print("total error: {}".format(mean_error / len(objpoints)))
 
     evaluateCalibration()
-
-    np.savez(filepath, mtx=mtx, dist=dist, rvecs=rvecs, tvecs=tvecs)
-
-    print(f"Calibration done. Calibration matrix saved in {filepath}")
+    if filepath is not None:
+        np.savez(filepath, mtx=mtx, dist=dist, rvecs=rvecs, tvecs=tvecs)
+        print(f"Calibration done. Calibration matrix saved in {filepath}")
 
     return mtx, dist
 
@@ -195,26 +203,69 @@ def detectAruco(
     )
 
     if ids is None:
-        print("No markers found")
+        if debug:
+            print("No markers found")
         return detected, rejected
 
     for i, id in enumerate(ids):
         detected[id[0]] = corners[i]
     if debug:
-        colors = [
-            (0, (255, 0, 0)),
-            (1, (0, 255, 0)),
-            (2, (0, 0, 255)),
-            (3, (255, 255, 0)),
-        ]
-
-        for c in corners:
-            for l in colors:
-                cv.circle(img, (int(c[0][l[0]][0]), int(c[0][l[0]][1])), 10, l[1], -1)
-                print("Color is : ", l[1])
         print("Detected aruco markers : ", detected.keys())
-        cv.imwrite("debug_aruco.png", img)
     return detected, rejected
+
+
+def locateAruco(id, corners, length, mtx, dist, R_camera, tvec_camera):
+
+    rvec, tvec, _ = cv.aruco.estimatePoseSingleMarkers(corners, length, mtx, dist)
+
+    tvec_marker_world = (
+        np.dot(R_camera.flatten(), tvec.flatten()) + tvec_camera.flatten()
+    )
+    return Aruco(
+        id,
+        Position(tvec_marker_world[0], tvec_marker_world[1], tvec_marker_world[2]),
+    )
+
+
+def processAruco(
+    fixedArucos: list[Aruco], movingArucos: list[int], mtx, dist, img, accept_none=False
+):
+    arucos, rejected = detectAruco(img, debug=False)
+    final_image_points = []
+    final_obj_points = []
+    for aruco in fixedArucos:
+        if arucos.get(aruco.id) is None:
+            continue
+        else:
+            for c in aruco.getCornersAsList():
+                final_obj_points.append(c)
+            for c in arucos[aruco.id][0]:
+                final_image_points.append(c.tolist())
+
+    if len(final_image_points) < 4 or len(final_obj_points) < 4:
+        if accept_none:
+            return None, None
+        raise Exception("Could not find any ArUco markers in the image")
+
+    final_image_points = np.array(final_image_points)
+    final_obj_points = np.array(final_obj_points)
+
+    rvec, tvec = PnP(
+        np.array(final_image_points, dtype=np.float32),
+        np.array(final_obj_points, dtype=np.float32),
+        mtx,
+        dist,
+    )
+
+    locatedArucos = {}
+
+    for id in movingArucos:
+        if arucos.get(id) is None:
+            continue
+        else:
+            locatedArucos[id] = locateAruco(id, arucos[id], 3, mtx, dist, rvec, tvec)
+
+    return rvec, tvec, locatedArucos
 
 
 def PnP(image_points, object_points, mtx, dist) -> tuple[list, list]:
@@ -232,16 +283,23 @@ def PnP(image_points, object_points, mtx, dist) -> tuple[list, list]:
 
     # Solve PnP to estimate rotation and translation
 
-    success, rvec, tvec = cv.solvePnP(object_points, image_points, mtx, dist)
+    try:
+        success, rvec, tvec = cv.solvePnP(object_points, image_points, mtx, dist)
+    except cv.error as e:
+        print("An error occured while solving PnP")
+        print(
+            f"Object point n°: {len(object_points)}, Image point n°: {len(image_points)}"
+        )
+        raise e
     # success, rvec, tvec, inliers = cv.solvePnPRansac(
     #     object_points, image_points, mtx, dist
     # )
     if success:
         # Project a new 3D point using the estimated pose
-        new_3d_point = np.array(
-            [(0.5, 0.5, 0.0)], dtype=np.float32
-        )  # Center of the square
-        projected_2d, _ = cv.projectPoints(new_3d_point, rvec, tvec, mtx, dist)
+        # new_3d_point = np.array(
+        #     [(0.5, 0.5, 0.0)], dtype=np.float32
+        # )  # Center of the square
+        # projected_2d, _ = cv.projectPoints(new_3d_point, rvec, tvec, mtx, dist)
         return rvec, tvec
     else:
         print("Could not solve PnP")
@@ -318,7 +376,7 @@ def plot_camera_pose(positions: list, rotations: list, arucos: list[Aruco]):
     plt.show()
 
 
-def getPosition(img, mtx, dist, aruco_positions: dict[int, Aruco]):
+def getPosition(img, mtx, dist, aruco_positions: dict[int, Aruco], accept_none=False):
     """
     Get the position of the camera from an image containing an ArUco marker.
 
@@ -328,13 +386,13 @@ def getPosition(img, mtx, dist, aruco_positions: dict[int, Aruco]):
     :param object_points: The 3D object points
     :return: The rotation and translation
     """
-    arucos, rejected = detectAruco(img, debug=True)
+    arucos, rejected = detectAruco(img, debug=False)
     final_image_points = []
     final_obj_points = []
 
     for id in aruco_positions.keys():
         if arucos.get(id) is None:
-            print(f"Marker {id} not found in picture !")
+            continue
         else:
             aruco = aruco_positions[id]
             for c in aruco.corners:
@@ -345,12 +403,17 @@ def getPosition(img, mtx, dist, aruco_positions: dict[int, Aruco]):
     final_image_points = np.array(final_image_points)
     final_obj_points = np.array(final_obj_points)
 
-    assert len(final_image_points) > 0 and len(final_obj_points) > 0
+    if len(final_image_points) == 0 or len(final_obj_points) == 0:
+        if accept_none:
+            return None, None
+        raise Exception("Could not find any ArUco markers in the image")
 
     assert len(final_image_points) == len(final_obj_points)
-    print("Found ", len(final_image_points), " points")
     rvec, tvec = PnP(
-        np.array(final_image_points), np.array(final_obj_points), mtx, dist
+        np.array(final_image_points, dtype=np.float32),
+        np.array(final_obj_points, dtype=np.float32),
+        mtx,
+        dist,
     )
     return rvec, tvec
 
