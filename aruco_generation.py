@@ -31,9 +31,10 @@ def generate_aruco_marker(
     print(f"ArUco marker (ID: {marker_id}) saved as {save_path}")
 
 
-ids = range(0, 0)
-
+ids = range(0, 50)
 
 for id in ids:
     # Example usage
-    generate_aruco_marker(marker_id=id, save_path=f"./aruco/aruco_{id}.png")
+    generate_aruco_marker(
+        marker_id=id, save_path=f"./aruco/aruco_{id}.png", marker_size=1000
+    )

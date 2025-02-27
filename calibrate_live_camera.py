@@ -14,8 +14,8 @@ def startCalibration(cameraId):
     subprocess.run(["v4l2-ctl", "-d", str(cameraId), "-c", "focus_absolute=0"])
     camera = cv.VideoCapture(cameraId)
 
-    camera.set(cv.CAP_PROP_FRAME_WIDTH, 1920)
-    camera.set(cv.CAP_PROP_FRAME_HEIGHT, 1080)
+    # camera.set(cv.CAP_PROP_FRAME_WIDTH, 1920)
+    # camera.set(cv.CAP_PROP_FRAME_HEIGHT, 1080)
 
     done = False
 

@@ -6,30 +6,6 @@ from pygame.time import Clock
 import open3d as o3d
 
 
-class Camera:
-    deviceId: int
-    captureStream: cv.VideoCapture
-    mtx: np.ndarray
-    dist: np.ndarray
-    position: np.ndarray
-    rotation: np.ndarray
-
-    def __init__(self, deviceId, calibrationFile):
-        self.deviceId = deviceId
-        self.calibrationFile = calibrationFile
-        self.captureStream = cv.VideoCapture(deviceId)
-        # self.captureStream.set(cv.CAP_PROP_FRAME_WIDTH, 1920)
-        # self.captureStream.set(cv.CAP_PROP_FRAME_HEIGHT, 1080)
-        self.mtx, self.dist = loadCalibration(calibrationFile)
-
-
-cameras = [
-    # Camera(0, "calibration/integrated_full.npz"),
-    Camera(2, "calibration/logitec_2_f30.npz"),
-    Camera(4, "calibration/logitec_4_f30.npz"),
-]
-
-
 def markMarkers(frame):
     """
     Mark the detected markers on the frame
@@ -49,7 +25,7 @@ def markMarkers(frame):
     return frame
 
 
-def locateCamera(cameras: list[Camera], arucos: dict[int, Aruco]):
+def locateCamera(cameras: list[Camera], arucos: list[int, Aruco]):
     """
     Visualize the cameras and arucos in 3D space
 
@@ -60,13 +36,7 @@ def locateCamera(cameras: list[Camera], arucos: dict[int, Aruco]):
     Returns:
         None
     """
-    cube_size = 3.0
-    colors = {
-        0: [0.0, 0.0, 1.0],
-        1: [0.0, 1.0, 0.0],
-        2: [1.0, 0.0, 0.0],
-        3: [1.0, 1.0, 0.0],
-    }
+    cube_size = 30
     meshs = []
     for a in arucos.values():
         # Create a TriangleMesh
@@ -76,7 +46,7 @@ def locateCamera(cameras: list[Camera], arucos: dict[int, Aruco]):
             [[0, 1, 2], [0, 2, 3]]
         )  # Two triangles
         # Optional: Add color
-        mesh.paint_uniform_color(colors[a.id])  # Light blue
+        mesh.paint_uniform_color([1.0, 0.0, 0.0])  # Light blue
         # Compute normals for better lighting
         mesh.compute_vertex_normals()
         meshs.append(mesh)
@@ -101,8 +71,8 @@ def locateCamera(cameras: list[Camera], arucos: dict[int, Aruco]):
 
     # Setting open3d view position
     ctl = vis.get_view_control()
-    ctl.set_constant_z_far(1000)
-    ctl.camera_local_translate(forward=-100, right=0.0, up=0)
+    ctl.set_constant_z_far(100000)
+    ctl.camera_local_translate(forward=-1000, right=0.0, up=0)
     while True:
         for i, camera in enumerate(cameras):
             ret, frame = camera.captureStream.read()
@@ -113,11 +83,13 @@ def locateCamera(cameras: list[Camera], arucos: dict[int, Aruco]):
             )
             if rvec is None:
                 continue
-            R, _ = cv.Rodrigues(rvec)
-            camera_world_position = -R.T @ tvec
-            camera.position = camera_world_position
+
+            position, R = locateCameraWorld(rvec, tvec)
+
+            camera.position = position
             camera.rotation = R
-            cubes[i].translate(camera_world_position, relative=False)
+            print("Position is : ", camera.position)
+            cubes[i].translate(camera.position, relative=False)
 
             vis.update_geometry(cubes[i])
         for m in meshs:
@@ -126,13 +98,32 @@ def locateCamera(cameras: list[Camera], arucos: dict[int, Aruco]):
         vis.update_renderer()
 
 
+cameras = [
+    # Camera(0, "calibration/integrated_full.npz"),
+    Camera(0, "calibration/logitec_2_f30.npz"),
+    # Camera(2, "calibration/logitec_4_f30.npz"),
+]
+
+# Positions are in mm
+# Those dimensions and positions match the ones present in the inkscape file located in ./inkscape/10_to_15.svg
+# The origin is then placed in the top left corner of the paper
 arucos: dict[int, Aruco] = {
-    0: Aruco(0, Position(0, 0, 0), size=3),
-    1: Aruco(1, Position(15, 3, 0), size=3),
-    2: Aruco(2, Position(3, 18, 0), size=3),
-    3: Aruco(3, Position(18, 19, 0), size=3),
+    10: Aruco(10, Position(10, 15, 0), size=80),
+    11: Aruco(11, Position(120, 15, 0), size=80),
+    12: Aruco(12, Position(10, 110, 0), size=80),
+    13: Aruco(13, Position(120, 110, 0), size=80),
+    14: Aruco(14, Position(10, 205, 0), size=80),
+    15: Aruco(15, Position(120, 205, 0), size=80),
 }
 
-locateCamera(cameras, arucos)
+
+fixed = [10, 11, 14, 15]
+toLocate = {}
+
+for i in fixed:
+    toLocate[i] = arucos[i]
+
+
+locateCamera(cameras, toLocate)
 
 cv.destroyAllWindows()

@@ -3,6 +3,37 @@ from matplotlib import pyplot as plt
 import numpy as np
 
 
+class Camera:
+    deviceId: int
+    captureStream: cv.VideoCapture
+    mtx: np.ndarray
+    dist: np.ndarray
+    rvec: np.ndarray
+    tvec: np.ndarray
+    world_position: np.ndarray
+    rotation_matrix: np.ndarray
+
+    def __init__(self, deviceId, calibrationFile):
+        self.deviceId = deviceId
+        self.calibrationFile = calibrationFile
+        self.captureStream = cv.VideoCapture(deviceId)
+        # self.captureStream.set(cv.CAP_PROP_FRAME_WIDTH, 1920)
+        # self.captureStream.set(cv.CAP_PROP_FRAME_HEIGHT, 1080)
+        self.mtx, self.dist = loadCalibration(calibrationFile)
+
+    def updateWorldPosition(self, rvec, tvec):
+        import ipdb
+
+        ipdb.set_trace()
+        self.rvec = rvec
+        self.tvec = tvec.flatten()
+        self.rotation_matrix, _ = cv.Rodrigues(rvec)
+        self.world_position = invertRefChange(
+            np.array([0.0, 0.0, 0.0]), self.rotation_matrix, self.tvec
+        )
+        return self.world_position, self.rotation_matrix
+
+
 class Point:
     def __init__(self, x: float, y: float):
         self.x = x
@@ -40,6 +71,15 @@ class Aruco:
                 [self.corners[3].x, self.corners[3].y, self.corners[3].z],
             ]
         )
+
+
+def refChange(position: np.ndarray, rot_mat, tvec):
+    return rot_mat @ position + tvec
+
+
+def invertRefChange(position: np.ndarray, rot_mat, tvec):
+    inv_tvec = -rot_mat.T @ tvec
+    return rot_mat.T @ position + inv_tvec
 
 
 def generate_aruco_marker(
@@ -134,7 +174,7 @@ def calibrateCamera(images, pointsToFind=(7, 7), filepath=None):
     return mtx, dist
 
 
-def undistort(mtx, dist, img):
+def undistort(camera: Camera, img):
     """
     Undistort an image using the camera matrix and distortion coefficients
 
@@ -145,10 +185,12 @@ def undistort(mtx, dist, img):
     """
 
     h, w = img.shape[:2]
-    newcameramtx, roi = cv.getOptimalNewCameraMatrix(mtx, dist, (w, h), 1, (w, h))
+    newcameramtx, roi = cv.getOptimalNewCameraMatrix(
+        camera.mtx, camera.dist, (w, h), 1, (w, h)
+    )
 
     # undistort
-    dst = cv.undistort(img, mtx, dist, None, newcameramtx)
+    dst = cv.undistort(img, camera.mtx, camera.dist, None, newcameramtx)
 
     # crop the image
     x, y, w, h = roi
@@ -161,7 +203,7 @@ def loadCalibration(path):
     return file["mtx"], file["dist"]
 
 
-def drawArucoCorners(frame, arucos: list[Point]):
+def drawArucoCorners(frame, img_points: list[Point]):
     colors = [
         (0, (255, 0, 0)),
         (1, (0, 255, 0)),
@@ -169,7 +211,7 @@ def drawArucoCorners(frame, arucos: list[Point]):
         (3, (255, 255, 0)),
     ]
 
-    for a in arucos:
+    for a in img_points:
         for c in colors:
             cv.circle(
                 frame,
@@ -214,32 +256,46 @@ def detectAruco(
     return detected, rejected
 
 
-def locateAruco(id, corners, length, mtx, dist, R_camera, tvec_camera):
+def locateAruco(aruco: Aruco, img_positions: list, camera: Camera):
 
-    rvec, tvec, _ = cv.aruco.estimatePoseSingleMarkers(corners, length, mtx, dist)
+    assert len(img_positions[0]) == 4
 
-    tvec_marker_world = (
-        np.dot(R_camera.flatten(), tvec.flatten()) + tvec_camera.flatten()
+    rvecs, tvecs, _ = cv.aruco.estimatePoseSingleMarkers(
+        img_positions, aruco.size, camera.mtx, camera.dist
     )
-    return Aruco(
-        id,
-        Position(tvec_marker_world[0], tvec_marker_world[1], tvec_marker_world[2]),
+
+    rvec = rvecs[0][0]  # Extract the rotation vector
+    tvec = tvecs[0][0]  # Extract the translation vector
+
+    center_position = np.array([0, 0, 0], dtype=np.float32)
+
+    R, _ = cv.Rodrigues(rvec)
+    center_position = refChange(center_position, R, tvec)
+
+    center_position = invertRefChange(
+        center_position, camera.rotation_matrix, camera.tvec
     )
+
+    return aruco
 
 
 def processAruco(
-    fixedArucos: list[Aruco], movingArucos: list[int], mtx, dist, img, accept_none=False
+    fixedArucos: list[Aruco],
+    movingArucos: list[Aruco],
+    camera: Camera,
+    img,
+    accept_none=False,
 ):
-    arucos, rejected = detectAruco(img, debug=False)
+    corners_position, rejected = detectAruco(img, debug=False)
     final_image_points = []
     final_obj_points = []
     for aruco in fixedArucos:
-        if arucos.get(aruco.id) is None:
+        if corners_position.get(aruco.id) is None:
             continue
         else:
             for c in aruco.getCornersAsList():
                 final_obj_points.append(c)
-            for c in arucos[aruco.id][0]:
+            for c in corners_position[aruco.id][0]:
                 final_image_points.append(c.tolist())
 
     if len(final_image_points) < 4 or len(final_obj_points) < 4:
@@ -253,17 +309,18 @@ def processAruco(
     rvec, tvec = PnP(
         np.array(final_image_points, dtype=np.float32),
         np.array(final_obj_points, dtype=np.float32),
-        mtx,
-        dist,
+        camera.mtx,
+        camera.dist,
     )
 
-    locatedArucos = {}
+    camera.updateWorldPosition(rvec, tvec)
 
-    for id in movingArucos:
-        if arucos.get(id) is None:
+    locatedArucos = {}
+    for a in movingArucos:
+        if corners_position.get(a.id) is None:
             continue
         else:
-            locatedArucos[id] = locateAruco(id, arucos[id], 3, mtx, dist, rvec, tvec)
+            locatedArucos[a.id] = locateAruco(a, corners_position[a.id], camera)
 
     return rvec, tvec, locatedArucos
 
@@ -433,6 +490,5 @@ if __name__ == "__main__":
     mtx, dist = loadCalibration("./calibration/calibration.npz")
 
     rvec, tvec = getPosition(cv.imread("./loca/1.jpg"), mtx, dist, aruco_positions)
-    R, _ = cv.Rodrigues(rvec)
-    camera_position = -R.T @ tvec
+    camera_position, R = locateCameraWorld(rvec, tvec)
     plot_camera_pose([camera_position], [R], aruco_positions.values())

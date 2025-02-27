@@ -2,32 +2,54 @@ from matplotlib import animation
 from aruco import *
 import cv2 as cv
 
-img = cv.imread("loca/loca_logi.jpg")
 
-mtx, dist = loadCalibration("calibration/logitec_2_f30.npz")
-
-FixedArucos: dict[int, Aruco] = {
-    0: Aruco(0, Position(0, 0, 0), size=3),
-    1: Aruco(1, Position(15, 3, 0), size=3),
-    2: Aruco(2, Position(3, 18, 0), size=3),
-}
+def takePicture(camID):
+    cap = cv.VideoCapture(camID)
+    ret, frame = cap.read()
+    cap.release()
+    return frame
 
 
-realPosition = {
-    3: Aruco(3, Position(18, 19, 0), size=3),
-}
+def test():
+    img = cv.imread("loca/loca_logi.jpg")
 
-movingArucos = [3]
+    cam = Camera(0, "calibration/logitec_2_f30.npz")
+
+    arucos: dict[int, Aruco] = {
+        10: Aruco(10, Position(10, 15, 0), size=80),
+        11: Aruco(11, Position(120, 15, 0), size=80),
+        12: Aruco(12, Position(10, 110, 0), size=80),
+        13: Aruco(13, Position(120, 110, 0), size=80),
+        14: Aruco(14, Position(10, 205, 0), size=80),
+        15: Aruco(15, Position(120, 205, 0), size=80),
+    }
+
+    fixed = [10, 11, 14, 15]
+
+    fixedArucos = {}
+
+    for i in fixed:
+        fixedArucos[i] = arucos[i]
+
+    locate = [12, 13]
+    locateArucos = {}
+
+    for i in locate:
+        locateArucos[i] = arucos[i]
+
+    rvec, tvec, locatedArucos = processAruco(
+        fixedArucos.values(), locateArucos.values(), cam, img
+    )
+
+    position, R = locateCameraWorld(rvec, tvec)
+
+    import ipdb
+
+    ipdb.set_trace()
 
 
-rvec, tvec, locatedArucos = processAruco(
-    FixedArucos.values(), movingArucos, mtx, dist, img
-)
+test()
 
+# img = takePicture(0)
 
-for c in locatedArucos[3].corners:
-    print("Aruco corner location : ", c.x, c.y, c.z)
-
-import ipdb
-
-ipdb.set_trace()
+# cv.imwrite("loca/loca_logi.jpg", img)
