@@ -73,11 +73,18 @@ class Aruco:
     def getCornersAsList(self):
         return np.array(
             [
-                [self.corners[0].toList()],
-                [self.corners[1].toList()],
-                [self.corners[2].toList()],
-                [self.corners[3].toList()],
+                self.corners[0].toList(),
+                self.corners[1].toList(),
+                self.corners[2].toList(),
+                self.corners[3].toList(),
             ]
+        )
+
+    def getCenter(self):
+        return Position(
+            self.corners[0].x + self.size / 2,
+            self.corners[0].y + self.size / 2,
+            self.corners[0].z,
         )
 
 
@@ -275,10 +282,9 @@ def locateAruco(aruco: Aruco, img_positions: list, camera: Camera):
     rvec = rvecs[0][0]  # Extract the rotation vector
     tvec = tvecs[0][0]  # Extract the translation vector
 
-    center_position = np.array([0, 0, 0], dtype=np.float32)
     topLeft = Position(-aruco.size / 2, -aruco.size / 2, 0)
 
-    corners_position = aruco.setCornersFromTopLeft(topLeft)
+    aruco.corners = aruco.setCornersFromTopLeft(topLeft)
 
     R, _ = cv.Rodrigues(rvec)
 
@@ -286,10 +292,6 @@ def locateAruco(aruco: Aruco, img_positions: list, camera: Camera):
         pos = refChange(pos, R, tvec)
         pos = invertRefChange(pos, camera.rotation_matrix, camera.tvec)
         return pos
-
-    import ipdb
-
-    ipdb.set_trace()
 
     for i in range(len(aruco.corners)):
         newPos = convertFromMarkerToWorld(aruco.corners[i].toList())
@@ -319,7 +321,7 @@ def processAruco(
 
     if len(final_image_points) < 4 or len(final_obj_points) < 4:
         if accept_none:
-            return None, None
+            return False
         raise Exception("Could not find any ArUco markers in the image")
 
     final_image_points = np.array(final_image_points)
@@ -334,7 +336,7 @@ def processAruco(
 
     camera.updateWorldPosition(rvec, tvec)
 
-    locatedArucos = {}
+    locatedArucos: dict[int, Aruco] = {}
     for a in movingArucos:
         if corners_position.get(a.id) is None:
             continue
@@ -380,134 +382,3 @@ def PnP(image_points, object_points, mtx, dist) -> tuple[list, list]:
     else:
         print("Could not solve PnP")
         raise Exception("Could not solve PnP")
-
-
-def draw_camera_position(ax, position, rotation):
-    point = ax.scatter(*position.flatten(), color="black")
-    camera_direction = rotation[:, 2]
-    endpoint = position.flatten() + 10 * camera_direction
-    # Plot the camera direction of looking
-    line = ax.plot(
-        [position[0][0], endpoint[0]],
-        [position[1][0], endpoint[1]],
-        [position[2][0], endpoint[2]],
-        color="purple",
-    )
-    return point, line
-
-
-def init_3d_plot():
-    fig = plt.figure()
-    ax = fig.add_subplot(111, projection="3d")
-    ax.set_xlabel("X")
-    ax.set_ylabel("Y")
-    ax.set_zlabel("Z")
-    ax.set_xbound(-50, 50)
-    ax.set_ybound(-50, 50)
-    ax.set_zbound(-50, 50)
-    return ax, fig
-
-
-def draw_arucos(ax, arucos):
-    for aruco in arucos:
-        # Draw the aruco id on top of the marker
-        ax.text(aruco.corners[0].x, aruco.corners[0].y - 1, 0.0, aruco.id, fontsize=20)
-        for i in range(0, len(aruco.corners)):
-            # Draw a square corresponding to the marker position
-            ax.plot(
-                [aruco.corners[i].x, aruco.corners[(i + 1) % 4].x],
-                [aruco.corners[i].y, aruco.corners[(i + 1) % 4].y],
-                [aruco.corners[i].z, aruco.corners[(i + 1) % 4].z],
-                color="black",
-            )
-
-
-def plot_camera_pose(positions: list, rotations: list, arucos: list[Aruco]):
-    """
-    Plot the camera pose and object points in 3D.
-
-    :param positions: The camera positions
-    :param rotations: The camera rotations
-    :param arucos: The arucos
-    """
-
-    ax, fig = init_3d_plot()
-
-    # Plot camera positions
-    for i, p in enumerate(positions):
-        ax.scatter(*p.flatten(), color="black", label=f"Camera Position {i}")
-        camera_direction = rotations[i][:, 2]
-        endpoint = p.flatten() + 10 * camera_direction
-        # Plot the camera direction of looking
-        ax.plot(
-            [p[0][0], endpoint[0]],
-            [p[1][0], endpoint[1]],
-            [p[2][0], endpoint[2]],
-            color="purple",
-        )
-
-    draw_arucos(ax, arucos)
-
-    ax.legend()
-    plt.show()
-
-
-def getPosition(img, mtx, dist, aruco_positions: dict[int, Aruco], accept_none=False):
-    """
-    Get the position of the camera from an image containing an ArUco marker.
-
-    :param img: The image
-    :param mtx: The camera matrix
-    :param dist: The distortion coefficients
-    :param object_points: The 3D object points
-    :return: The rotation and translation
-    """
-    arucos, rejected = detectAruco(img, debug=False)
-    final_image_points = []
-    final_obj_points = []
-
-    for id in aruco_positions.keys():
-        if arucos.get(id) is None:
-            continue
-        else:
-            aruco = aruco_positions[id]
-            for c in aruco.corners:
-                final_obj_points.append([c.x, c.y, c.z])
-            for c in arucos[id][0]:
-                final_image_points.append(c.tolist())
-
-    final_image_points = np.array(final_image_points)
-    final_obj_points = np.array(final_obj_points)
-
-    if len(final_image_points) == 0 or len(final_obj_points) == 0:
-        if accept_none:
-            return None, None
-        raise Exception("Could not find any ArUco markers in the image")
-
-    assert len(final_image_points) == len(final_obj_points)
-    rvec, tvec = PnP(
-        np.array(final_image_points, dtype=np.float32),
-        np.array(final_obj_points, dtype=np.float32),
-        mtx,
-        dist,
-    )
-    return rvec, tvec
-
-
-if __name__ == "__main__":
-    # Example of camera localization in 3d using 4 aruco markers
-    # This is the linking between aruco markers for the result graph
-
-    # This is the positions of the aruco markers in the 3d world
-    aruco_positions: dict[int, Aruco] = {
-        0: Aruco(0, Position(0, 0, 0)),
-        1: Aruco(1, Position(15, 3, 0)),
-        2: Aruco(2, Position(3, 18, 0)),
-        3: Aruco(3, Position(18, 19, 0)),
-    }
-
-    mtx, dist = loadCalibration("./calibration/calibration.npz")
-
-    rvec, tvec = getPosition(cv.imread("./loca/1.jpg"), mtx, dist, aruco_positions)
-    camera_position, R = locateCameraWorld(rvec, tvec)
-    plot_camera_pose([camera_position], [R], aruco_positions.values())

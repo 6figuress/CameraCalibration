@@ -5,7 +5,48 @@ from aruco import *
 import subprocess
 
 
+def calibrateLiveCamera():
+    print("Enter the camera ID:")
+    cameraId = int(input())
+    startCalibration(cameraId)
+
+
+def findCameraId():
+    # !! Not working for now !!
+    # TODO: To fix..
+    print(
+        "We will show you each camera feed until you find what you are looking for..."
+    )
+    done = False
+    print("Press n to pass to next camera, press q to quit.")
+    currCameraId = 0
+    while not done:
+        print("Showing video feed for camera ", currCameraId)
+        cap = cv.VideoCapture(currCameraId)
+        showingFeed = True
+        while showingFeed:
+            ret, frame = cap.read()
+            if ret:
+                cv.imshow("frame", frame)
+                key = cv.waitKey(1)
+                if key == ord("q"):
+                    done = True
+                    break
+                elif key == ord("n"):
+                    currCameraId += 1
+                    break
+            else:
+                currCameraId += 1
+
+
 def startCalibration(cameraId):
+    """
+    Calibrate a camera from a live camera feed
+
+    :param
+    cameraId - The id of the camera to calibrate
+    """
+
     # Initialize the camera
     subprocess.run(
         ["v4l2-ctl", "-d", str(cameraId), "-c", "focus_automatic_continuous=0"]
@@ -49,6 +90,4 @@ def startCalibration(cameraId):
 
 
 if __name__ == "__main__":
-    print("Enter the camera ID:")
-    cameraId = int(input())
-    startCalibration(cameraId)
+    calibrateLiveCamera()

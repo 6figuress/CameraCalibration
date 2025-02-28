@@ -25,7 +25,67 @@ def markMarkers(frame):
     return frame
 
 
-def locateCamera(cameras: list[Camera], arucos: list[int, Aruco]):
+def initVisualization(
+    cameras: list[Camera], baseMarkers: dict[int, Aruco], movingMarker: dict[int, Aruco]
+):
+    cube_size = 30
+    baseMarkersMeshes = {}
+    movingMarkersMeshes = {}
+
+    initialPosition = [0, 0, 0]
+
+    def createMesh(corners, color=[1.0, 0.0, 0.0]):
+        mesh = o3d.geometry.TriangleMesh()
+        mesh.vertices = o3d.utility.Vector3dVector(corners)
+        mesh.triangles = o3d.utility.Vector3iVector([[0, 1, 2], [0, 2, 3]])
+        mesh.paint_uniform_color(color)  # Light blue
+        # Compute normals for better lighting
+        mesh.compute_vertex_normals()
+        return mesh
+
+    for a in baseMarkers.values():
+        # Create a TriangleMesh
+        baseMarkersMeshes[a.id] = createMesh(a.getCornersAsList())
+
+    for a in movingMarker.values():
+        movingMarkersMeshes[a.id] = createMesh(a.getCornersAsList(), [0.0, 1.0, 0.0])
+
+        # movingMarkersMeshes[a.id] = createMesh(a.getCornersAsList(), [0.0, 1.0, 0.0])
+
+    vis = o3d.visualization.Visualizer()
+    vis.create_window()
+
+    camerasCube = []
+
+    for c in cameras:
+        # Cube representing camera
+        cube = o3d.geometry.TriangleMesh.create_box(cube_size, cube_size, cube_size)
+        cube.paint_uniform_color([0.8, 0.5, 0.5])  # Purple
+        cube.compute_vertex_normals()
+        cube.translate(initialPosition)
+        camerasCube.append(cube)
+
+    for m in (
+        list(baseMarkersMeshes.values())
+        + list(movingMarkersMeshes.values())
+        + camerasCube
+    ):
+        # Visualize
+        vis.add_geometry(m)
+
+    # Setting open3d view position
+    ctl = vis.get_view_control()
+    ctl.set_constant_z_far(100000)
+    ctl.camera_local_translate(forward=-1000, right=0.0, up=0)
+
+    return vis, baseMarkersMeshes, movingMarkersMeshes, camerasCube
+
+
+def locateCamera(
+    cameras: list[Camera],
+    fixedMarkers: dict[int, Aruco],
+    movingMarkers: dict[int, Aruco],
+):
     """
     Visualize the cameras and arucos in 3D space
 
@@ -36,63 +96,49 @@ def locateCamera(cameras: list[Camera], arucos: list[int, Aruco]):
     Returns:
         None
     """
-    cube_size = 30
-    meshs = []
-    for a in arucos.values():
-        # Create a TriangleMesh
-        mesh = o3d.geometry.TriangleMesh()
-        mesh.vertices = o3d.utility.Vector3dVector(a.getCornersAsList())
-        mesh.triangles = o3d.utility.Vector3iVector(
-            [[0, 1, 2], [0, 2, 3]]
-        )  # Two triangles
-        # Optional: Add color
-        mesh.paint_uniform_color([1.0, 0.0, 0.0])  # Light blue
-        # Compute normals for better lighting
-        mesh.compute_vertex_normals()
-        meshs.append(mesh)
 
-    vis = o3d.visualization.Visualizer()
-    vis.create_window()
+    vis, baseMarkersMeshes, movingMarkersMeshes, camerasCube = initVisualization(
+        cameras, fixedMarkers, movingMarkers
+    )
 
-    for m in meshs:
-        # Visualize
-        vis.add_geometry(m)
-
-    cubes = []
-
-    for c in cameras:
-        # Cube representing camera
-        cube = o3d.geometry.TriangleMesh.create_box(cube_size, cube_size, cube_size)
-        cube.paint_uniform_color([0.8, 0.5, 0.5])  # Purple
-        cube.compute_vertex_normals()
-        cube.translate([15, 15, 0])
-        cubes.append(cube)
-        vis.add_geometry(cube)
-
-    # Setting open3d view position
-    ctl = vis.get_view_control()
-    ctl.set_constant_z_far(100000)
-    ctl.camera_local_translate(forward=-1000, right=0.0, up=0)
     while True:
         for i, camera in enumerate(cameras):
             ret, frame = camera.captureStream.read()
             if not ret:
                 continue
-            rvec, tvec = getPosition(
-                frame, camera.mtx, camera.dist, arucos, accept_none=True
+
+            res = processAruco(
+                fixedMarkers.values(),
+                movingMarkers.values(),
+                camera,
+                frame,
+                accept_none=True,
             )
-            if rvec is None:
+
+            if res == False:
+                # Camera position could not be found
                 continue
 
-            position, R = locateCameraWorld(rvec, tvec)
+            locatedArucos = res[2]
 
-            camera.position = position
-            camera.rotation = R
-            print("Position is : ", camera.position)
-            cubes[i].translate(camera.position, relative=False)
+            if i == 0:
 
-            vis.update_geometry(cubes[i])
-        for m in meshs:
+                for id in locatedArucos.keys():
+                    # Update the vertices of the mesh
+                    pos = locatedArucos[id].corners[0].toList()
+                    pos[0] += locatedArucos[id].size / 2
+                    pos[1] -= locatedArucos[id].size / 2
+                    movingMarkersMeshes[id].translate(pos, relative=False)
+
+                print(movingMarkersMeshes[13])
+
+            camerasCube[i].translate(camera.world_position, relative=False)
+
+        for m in (
+            list(baseMarkersMeshes.values())
+            + list(movingMarkersMeshes.values())
+            + camerasCube
+        ):
             vis.update_geometry(m)
         vis.poll_events()
         vis.update_renderer()
@@ -100,8 +146,8 @@ def locateCamera(cameras: list[Camera], arucos: list[int, Aruco]):
 
 cameras = [
     # Camera(0, "calibration/integrated_full.npz"),
-    Camera(0, "calibration/logitec_2_f30.npz"),
-    # Camera(2, "calibration/logitec_4_f30.npz"),
+    Camera(2, "calibration/logitec_2_f30.npz"),
+    Camera(4, "calibration/logitec_4_f30.npz"),
 ]
 
 # Positions are in mm
@@ -118,12 +164,18 @@ arucos: dict[int, Aruco] = {
 
 
 fixed = [10, 11, 14, 15]
-toLocate = {}
+moving = [12, 13]
+fixedMarkers = {}
+
+movingMarkers = {}
 
 for i in fixed:
-    toLocate[i] = arucos[i]
+    fixedMarkers[i] = arucos[i]
+
+for i in moving:
+    movingMarkers[i] = arucos[i]
 
 
-locateCamera(cameras, toLocate)
+locateCamera(cameras, fixedMarkers, movingMarkers)
 
 cv.destroyAllWindows()
