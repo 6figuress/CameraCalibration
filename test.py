@@ -41,12 +41,6 @@ def test():
         fixedArucos.values(), locateArucos.values(), cam, img
     )
 
-    position, R = locateCameraWorld(rvec, tvec)
-
-    import ipdb
-
-    ipdb.set_trace()
-
 
 test()
 

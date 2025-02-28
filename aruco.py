@@ -22,9 +22,6 @@ class Camera:
         self.mtx, self.dist = loadCalibration(calibrationFile)
 
     def updateWorldPosition(self, rvec, tvec):
-        import ipdb
-
-        ipdb.set_trace()
         self.rvec = rvec
         self.tvec = tvec.flatten()
         self.rotation_matrix, _ = cv.Rodrigues(rvec)
@@ -45,6 +42,13 @@ class Position(Point):
         super().__init__(x, y)
         self.z = z
 
+    def toList(self):
+        return [self.x, self.y, self.z]
+
+    def __repr__(self):
+        cls = self.__class__.__name__
+        return f"{cls}({self.x}, {self.y}, {self.z})"
+
     def __str__(self):
         return f"({self.x}, {self.y}, {self.z})"
 
@@ -54,21 +58,25 @@ class Aruco:
 
     def __init__(self, id: int, topLeft: Position, size: float = 1.0):
         self.id = id
-        self.corners = [
-            topLeft,
-            Position(topLeft.x + size, topLeft.y, topLeft.z),
-            Position(topLeft.x + size, topLeft.y + size, topLeft.z),
-            Position(topLeft.x, topLeft.y + size, topLeft.z),
-        ]
         self.size = size
+        self.corners = self.setCornersFromTopLeft(topLeft)
+
+    def setCornersFromTopLeft(self, topLeft: Position):
+        corners = [
+            topLeft,
+            Position(topLeft.x + self.size, topLeft.y, topLeft.z),
+            Position(topLeft.x + self.size, topLeft.y + self.size, topLeft.z),
+            Position(topLeft.x, topLeft.y + self.size, topLeft.z),
+        ]
+        return corners
 
     def getCornersAsList(self):
         return np.array(
             [
-                [self.corners[0].x, self.corners[0].y, self.corners[0].z],
-                [self.corners[1].x, self.corners[1].y, self.corners[1].z],
-                [self.corners[2].x, self.corners[2].y, self.corners[2].z],
-                [self.corners[3].x, self.corners[3].y, self.corners[3].z],
+                [self.corners[0].toList()],
+                [self.corners[1].toList()],
+                [self.corners[2].toList()],
+                [self.corners[3].toList()],
             ]
         )
 
@@ -268,13 +276,24 @@ def locateAruco(aruco: Aruco, img_positions: list, camera: Camera):
     tvec = tvecs[0][0]  # Extract the translation vector
 
     center_position = np.array([0, 0, 0], dtype=np.float32)
+    topLeft = Position(-aruco.size / 2, -aruco.size / 2, 0)
+
+    corners_position = aruco.setCornersFromTopLeft(topLeft)
 
     R, _ = cv.Rodrigues(rvec)
-    center_position = refChange(center_position, R, tvec)
 
-    center_position = invertRefChange(
-        center_position, camera.rotation_matrix, camera.tvec
-    )
+    def convertFromMarkerToWorld(pos):
+        pos = refChange(pos, R, tvec)
+        pos = invertRefChange(pos, camera.rotation_matrix, camera.tvec)
+        return pos
+
+    import ipdb
+
+    ipdb.set_trace()
+
+    for i in range(len(aruco.corners)):
+        newPos = convertFromMarkerToWorld(aruco.corners[i].toList())
+        aruco.corners[i] = Position(*newPos)
 
     return aruco
 
