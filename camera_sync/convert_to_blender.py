@@ -14,9 +14,14 @@ arucos: dict[int, Aruco] = {
 }
 
 
+def convertCoordsToBlender(coords: list):
+    newCords = np.array([coords[0], -coords[1], coords[2]]) / 1000
+    return newCords
+
+
 def convertToBlender(arcuo: Aruco):
     center = arcuo.getCenter().coords
-    return np.array([center[0], -center[1], center[2]])
+    return convertCoordsToBlender(center)
 
 
 bpy.ops.object.select_all(action="SELECT")
@@ -27,14 +32,19 @@ for a in arucos.values():
     bpy.ops.mesh.primitive_plane_add(
         size=a.size / 1000,
         enter_editmode=False,
-        location=(pos[0] / 1000, pos[1] / 1000, pos[2] / 1000),
+        location=(pos[0], pos[1], pos[2]),
     )
 
+bpy.ops.mesh.primitive_cube_add(
+    size=0.01,
+    location=convertCoordsToBlender([455.06650962, 430.20372182, -387.0078202]),
+)
+
 # Add a camera
-bpy.ops.object.camera_add(location=(5, -5, 5))
+bpy.ops.object.camera_add(location=(-5, 5, 5))
 camera = bpy.context.object
 
-camera.rotation_euler = (1.1093, 0, 0.7854)  # Adjust the rotation if needed
+camera.rotation_euler = (-1.0093, -0.0, -0.854)  # Adjust the rotation if needed
 
 bpy.context.scene.camera = camera
 
