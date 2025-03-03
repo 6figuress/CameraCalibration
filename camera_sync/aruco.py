@@ -39,7 +39,8 @@ class Aruco:
                 self.corners[2].coords,
                 self.corners[3].coords,
             ]
-        )
+        )        
+
 
     def getCenter(self) -> Position:
         return Position(

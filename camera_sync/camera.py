@@ -78,7 +78,13 @@ class Camera:
         self.dist = file["dist"]
         return file["mtx"], file["dist"]
 
-    def calibrateWithLiveFeed(self, pointsToFind=(7, 7)):
+    def takePic(self):
+        ret, frame = self.captureStream.read()
+        if ret:
+            return frame
+        return ret
+
+    def calibrateWithLiveFeed(self, pointsToFind=(7,7)):
         """
         Calibrate a camera from a live camera feed
 
@@ -205,30 +211,29 @@ class Camera:
             invertRefChange(np.array([0.0, 0.0, 0.0]), self.rotation_matrix, self.tvec)
         )
         return self.world_position, self.rotation_matrix
+    
+    def undistort(self, img):
+        """
+        Undistort an image using the camera matrix and distortion coefficients
 
+        :param mtx: The camera matrix
+        :param dist: The distortion coefficients
+        :param img: The image to undistort
+        :return: The undistorted image
+        """
 
-def undistort(camera: Camera, img):
-    """
-    Undistort an image using the camera matrix and distortion coefficients
+        h, w = img.shape[:2]
+        newcameramtx, roi = cv.getOptimalNewCameraMatrix(
+            self.mtx, self.dist, (w, h), 1, (w, h)
+        )
 
-    :param mtx: The camera matrix
-    :param dist: The distortion coefficients
-    :param img: The image to undistort
-    :return: The undistorted image
-    """
+        # undistort
+        dst = cv.undistort(img, self.mtx, self.dist, None, newcameramtx)
 
-    h, w = img.shape[:2]
-    newcameramtx, roi = cv.getOptimalNewCameraMatrix(
-        camera.mtx, camera.dist, (w, h), 1, (w, h)
-    )
-
-    # undistort
-    dst = cv.undistort(img, camera.mtx, camera.dist, None, newcameramtx)
-
-    # crop the image
-    x, y, w, h = roi
-    dst = dst[y : y + h, x : x + w]
-    return dst
+        # crop the image
+        x, y, w, h = roi
+        dst = dst[y : y + h, x : x + w]
+        return dst
 
 
 if __name__ == "__main__":
