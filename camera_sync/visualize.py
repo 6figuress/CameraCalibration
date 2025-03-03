@@ -1,6 +1,8 @@
 import cv2 as cv
 import open3d as o3d
-from aruco import Aruco, Camera, Position, processAruco
+from aruco import Aruco, processAruco
+from camera import Camera
+from position import Position
 
 
 def initVisualization(
@@ -57,8 +59,8 @@ def initVisualization(
         vis.add_geometry(m)
 
     ctl = vis.get_view_control()
-    ctl.set_constant_z_far(100000)
-    ctl.camera_local_translate(forward=-1000, right=0.0, up=0)
+    ctl.set_constant_z_far(1000000)
+    ctl.camera_local_translate(forward=-500, right=40, up=80)
 
     return vis, baseMarkersMeshes, movingMarkersMeshes, camerasCube
 
@@ -128,7 +130,7 @@ if __name__ == "__main__":
     cameras = [
         # Camera(0, "calibration/integrated_full.npz"),
         Camera(2, "calibration/logitec_2_f30.npz"),
-        Camera(4, "calibration/logitec_4_f30.npz"),
+        # Camera(4, "calibration/logitec_4_f30.npz"),
     ]
 
     # Positions are in mm

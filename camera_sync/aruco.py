@@ -1,59 +1,7 @@
 import cv2 as cv
 import numpy as np
-
-
-class Camera:
-    deviceId: int
-    captureStream: cv.VideoCapture
-    mtx: np.ndarray
-    dist: np.ndarray
-    rvec: np.ndarray
-    tvec: np.ndarray
-    world_position: np.ndarray
-    rotation_matrix: np.ndarray
-
-    def __init__(self, deviceId, calibrationFile):
-        self.deviceId = deviceId
-        self.calibrationFile = calibrationFile
-        self.captureStream = cv.VideoCapture(deviceId)
-        # self.captureStream.set(cv.CAP_PROP_FRAME_WIDTH, 1920)
-        # self.captureStream.set(cv.CAP_PROP_FRAME_HEIGHT, 1080)
-        self.mtx, self.dist = loadCalibration(calibrationFile)
-
-    def updateWorldPosition(self, rvec, tvec):
-        self.rvec = rvec
-        self.tvec = tvec.flatten()
-        self.rotation_matrix, _ = cv.Rodrigues(rvec)
-        self.world_position = invertRefChange(
-            np.array([0.0, 0.0, 0.0]), self.rotation_matrix, self.tvec
-        )
-        return self.world_position, self.rotation_matrix
-
-
-class Point:
-    coords: np.ndarray[float]
-
-    def __init__(self, x: float, y: float):
-        self.coords = np.array([x, y])
-
-    @property
-    def x(self) -> float:
-        return self.coords[0]
-
-    @property
-    def y(self) -> float:
-        return self.coords[1]
-
-
-class Position(Point):
-
-    def __init__(self, x: float, y: float, z: float):
-        self.coords = np.array([x, y, z])
-
-    @property
-    def z(self) -> float:
-        return self.coords[2]
-
+from camera import Camera
+from position import refChange, invertRefChange, Point, Position
 
 class Aruco:
     corners: list[Position] = None
@@ -95,15 +43,6 @@ class Aruco:
         return self.corners is not None
 
 
-def refChange(position: np.ndarray, rot_mat, tvec):
-    return rot_mat @ position + tvec
-
-
-def invertRefChange(position: np.ndarray, rot_mat, tvec):
-    inv_tvec = -rot_mat.T @ tvec
-    return rot_mat.T @ position + inv_tvec
-
-
 def generate_aruco_marker(
     marker_id,
     dictionary_id=cv.aruco.DICT_4X4_50,
@@ -135,97 +74,6 @@ def generate_aruco_marker(
     cv.imwrite(save_path, marker_image)
     print(f"ArUco marker (ID: {marker_id}) saved as {save_path}")
     return marker_image
-
-
-def calibrateCamera(images, pointsToFind=(7, 7), filepath=None):
-    """
-    Calibrate the camera using a set of images of a chessboard pattern.
-
-    :param images: A list of image file paths
-    :param pointsToFind: The number of points to find on the chessboard pattern
-    :param filepath: The file path to save the calibration matrix
-    :return: The camera matrix and distortion coefficients
-    """
-
-    # termination criteria
-    criteria = (cv.TERM_CRITERIA_EPS + cv.TERM_CRITERIA_MAX_ITER, 30, 0.001)
-
-    # prepare object points, like (0,0,0), (1,0,0), (2,0,0) ....,(6,5,0)
-    objp = np.zeros((pointsToFind[0] * pointsToFind[1], 3), np.float32)
-    objp[:, :2] = np.mgrid[0 : pointsToFind[0], 0 : pointsToFind[1]].T.reshape(-1, 2)
-
-    # Arrays to store object points and image points from all the images.
-    objpoints = []  # 3d point in real world space
-    imgpoints = []  # 2d points in image plane.
-
-    print("Starting calibration, this may take some time...")
-    for i, img in enumerate(images):
-        gray = cv.cvtColor(img, cv.COLOR_BGR2GRAY)
-
-        # Find the chess board corners
-        ret, corners = cv.findChessboardCorners(gray, pointsToFind, None)
-
-        # If found, add object points, image points (after refining them)
-        if ret:
-            objpoints.append(objp)
-
-            corners2 = cv.cornerSubPix(gray, corners, (11, 11), (-1, -1), criteria)
-            print(f"Found {len(corners2)} corners - pic {i + 1}/{len(images)}")
-            imgpoints.append(corners)
-
-            # Draw and display the corners
-            # img = cv.drawChessboardCorners(img, pointsToFind, corners2, ret)
-
-    ret, mtx, dist, rvecs, tvecs = cv.calibrateCamera(
-        objpoints, imgpoints, gray.shape[::-1], None, None
-    )
-
-    def evaluateCalibration():
-        mean_error = 0
-        for i in range(len(objpoints)):
-            imgpoints2, _ = cv.projectPoints(
-                objpoints[i], rvecs[i], tvecs[i], mtx, dist
-            )
-            error = cv.norm(imgpoints[i], imgpoints2, cv.NORM_L2) / len(imgpoints2)
-            mean_error += error
-
-        print("total error: {}".format(mean_error / len(objpoints)))
-
-    evaluateCalibration()
-    if filepath is not None:
-        np.savez(filepath, mtx=mtx, dist=dist, rvecs=rvecs, tvecs=tvecs)
-        print(f"Calibration done. Calibration matrix saved in {filepath}")
-
-    return mtx, dist
-
-
-def undistort(camera: Camera, img):
-    """
-    Undistort an image using the camera matrix and distortion coefficients
-
-    :param mtx: The camera matrix
-    :param dist: The distortion coefficients
-    :param img: The image to undistort
-    :return: The undistorted image
-    """
-
-    h, w = img.shape[:2]
-    newcameramtx, roi = cv.getOptimalNewCameraMatrix(
-        camera.mtx, camera.dist, (w, h), 1, (w, h)
-    )
-
-    # undistort
-    dst = cv.undistort(img, camera.mtx, camera.dist, None, newcameramtx)
-
-    # crop the image
-    x, y, w, h = roi
-    dst = dst[y : y + h, x : x + w]
-    return dst
-
-
-def loadCalibration(path):
-    file = np.load(path)
-    return file["mtx"], file["dist"]
 
 
 def drawArucoCorners(frame, img_points: list[Point]):
@@ -379,16 +227,8 @@ def PnP(image_points, object_points, mtx, dist) -> tuple[list, list]:
             f"Object point n°: {len(object_points)}, Image point n°: {len(image_points)}"
         )
         raise e
-    # success, rvec, tvec, inliers = cv.solvePnPRansac(
-    #     object_points, image_points, mtx, dist
-    # )
+
     if success:
-        # Project a new 3D point using the estimated pose
-        # new_3d_point = np.array(
-        #     [(0.5, 0.5, 0.0)], dtype=np.float32
-        # )  # Center of the square
-        # projected_2d, _ = cv.projectPoints(new_3d_point, rvec, tvec, mtx, dist)
         return rvec, tvec
     else:
-        print("Could not solve PnP")
         raise Exception("Could not solve PnP")
