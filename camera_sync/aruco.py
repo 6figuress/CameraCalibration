@@ -1,5 +1,4 @@
 import cv2 as cv
-from matplotlib import pyplot as plt
 import numpy as np
 
 
@@ -32,60 +31,68 @@ class Camera:
 
 
 class Point:
+    coords: np.ndarray[float]
+
     def __init__(self, x: float, y: float):
-        self.x = x
-        self.y = y
+        self.coords = np.array([x, y])
+
+    @property
+    def x(self) -> float:
+        return self.coords[0]
+
+    @property
+    def y(self) -> float:
+        return self.coords[1]
 
 
 class Position(Point):
+
     def __init__(self, x: float, y: float, z: float):
-        super().__init__(x, y)
-        self.z = z
+        self.coords = np.array([x, y, z])
 
-    def toList(self):
-        return [self.x, self.y, self.z]
-
-    def __repr__(self):
-        cls = self.__class__.__name__
-        return f"{cls}({self.x}, {self.y}, {self.z})"
-
-    def __str__(self):
-        return f"({self.x}, {self.y}, {self.z})"
+    @property
+    def z(self) -> float:
+        return self.coords[2]
 
 
 class Aruco:
-    corners: list[Position]
+    corners: list[Position] = None
 
-    def __init__(self, id: int, topLeft: Position, size: float = 1.0):
+    def __init__(self, id: int, size: float, topLeft: Position = None):
         self.id = id
         self.size = size
-        self.corners = self.setCornersFromTopLeft(topLeft)
+        if topLeft is not None:
+            self.corners = self.setCornersFromTopLeft(topLeft)
 
-    def setCornersFromTopLeft(self, topLeft: Position):
-        corners = [
+    def setCornersFromTopLeft(self, topLeft: Position) -> list[Position]:
+        self.corners = [
             topLeft,
             Position(topLeft.x + self.size, topLeft.y, topLeft.z),
             Position(topLeft.x + self.size, topLeft.y + self.size, topLeft.z),
             Position(topLeft.x, topLeft.y + self.size, topLeft.z),
         ]
-        return corners
+        return self.corners
 
-    def getCornersAsList(self):
+    def getCornersAsList(self) -> list[list[float]]:
         return np.array(
             [
-                self.corners[0].toList(),
-                self.corners[1].toList(),
-                self.corners[2].toList(),
-                self.corners[3].toList(),
+                self.corners[0].coords,
+                self.corners[1].coords,
+                self.corners[2].coords,
+                self.corners[3].coords,
             ]
         )
 
-    def getCenter(self):
+    def getCenter(self) -> Position:
         return Position(
             self.corners[0].x + self.size / 2,
             self.corners[0].y + self.size / 2,
             self.corners[0].z,
         )
+
+    @property
+    def isLocated(self) -> bool:
+        return self.corners is not None
 
 
 def refChange(position: np.ndarray, rot_mat, tvec):
@@ -101,7 +108,7 @@ def generate_aruco_marker(
     marker_id,
     dictionary_id=cv.aruco.DICT_4X4_50,
     marker_size=200,
-    save_path=f"./aruco/aruco_marker.png",
+    save_path=None,
 ):
     """
     Generates an ArUco marker and saves it as an image.
@@ -112,6 +119,9 @@ def generate_aruco_marker(
     :param save_path: The file path to save the marker image
     :return: The generated marker image
     """
+    if save_path is None:
+        save_path = f"./aruco/aruco_{marker_id}.png"
+
     # Load the predefined dictionary
     aruco_dict = cv.aruco.getPredefinedDictionary(dictionary_id)
 
@@ -156,7 +166,7 @@ def calibrateCamera(images, pointsToFind=(7, 7), filepath=None):
         ret, corners = cv.findChessboardCorners(gray, pointsToFind, None)
 
         # If found, add object points, image points (after refining them)
-        if ret == True:
+        if ret:
             objpoints.append(objp)
 
             corners2 = cv.cornerSubPix(gray, corners, (11, 11), (-1, -1), criteria)
@@ -294,7 +304,7 @@ def locateAruco(aruco: Aruco, img_positions: list, camera: Camera):
         return pos
 
     for i in range(len(aruco.corners)):
-        newPos = convertFromMarkerToWorld(aruco.corners[i].toList())
+        newPos = convertFromMarkerToWorld(aruco.corners[i].coords)
         aruco.corners[i] = Position(*newPos)
 
     return aruco
@@ -317,7 +327,7 @@ def processAruco(
             for c in aruco.getCornersAsList():
                 final_obj_points.append(c)
             for c in corners_position[aruco.id][0]:
-                final_image_points.append(c.tolist())
+                final_image_points.append(c)
 
     if len(final_image_points) < 4 or len(final_obj_points) < 4:
         if accept_none:

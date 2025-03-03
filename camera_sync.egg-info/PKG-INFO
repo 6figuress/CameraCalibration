@@ -1,0 +1,7 @@
+Metadata-Version: 2.2
+Name: camera_sync
+Version: 0.1
+Summary: A package to allow camera to localize aruco markers in a 3d world
+Author: 6 Figures
+Dynamic: author
+Dynamic: summary

@@ -1,6 +1,7 @@
 from time import sleep
+import numpy as np
 import cv2 as cv
-from aruco import *
+from aruco import calibrateCamera
 
 import subprocess
 
@@ -12,6 +13,10 @@ def calibrateLiveCamera():
 
 
 def findCameraId():
+    """
+    **NOT WORKING !**
+    Cycle to all connected camera preview to locate the wanted camera system id
+    """
     # !! Not working for now !!
     # TODO: To fix..
     print(

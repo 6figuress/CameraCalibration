@@ -1,8 +1,19 @@
 import matplotlib.pyplot as plt
-from aruco import *
+from aruco import Aruco
 
 
 def draw_camera_position(ax, position, rotation):
+    """
+    Draw the camera position and direction of looking in 3D.
+
+    Args:
+        ax: The 3D plot axis
+        position: The camera position
+        rotation: The camera rotation
+
+    Returns:
+        The point and line objects
+    """
     point = ax.scatter(*position.flatten(), color="black")
     camera_direction = rotation[:, 2]
     endpoint = position.flatten() + 10 * camera_direction
@@ -17,6 +28,9 @@ def draw_camera_position(ax, position, rotation):
 
 
 def init_3d_plot():
+    """
+    Initialize the 3d plot
+    """
     fig = plt.figure()
     ax = fig.add_subplot(111, projection="3d")
     ax.set_xlabel("X")
@@ -28,7 +42,14 @@ def init_3d_plot():
     return ax, fig
 
 
-def draw_arucos(ax, arucos):
+def draw_arucos(ax, arucos: list[Aruco]):
+    """
+    Draw the arucos positions
+
+    Args:
+        ax: The graph axes
+        arucos: The list of arucos to draw
+    """
     for aruco in arucos:
         # Draw the aruco id on top of the marker
         ax.text(aruco.corners[0].x, aruco.corners[0].y - 1, 0.0, aruco.id, fontsize=20)
@@ -46,9 +67,10 @@ def plot_camera_pose(positions: list, rotations: list, arucos: list[Aruco]):
     """
     Plot the camera pose and object points in 3D.
 
-    :param positions: The camera positions
-    :param rotations: The camera rotations
-    :param arucos: The arucos
+    Args:
+        positions: The camera positions
+        rotations: The camera rotations
+        arucos: The arucos
     """
 
     ax, fig = init_3d_plot()

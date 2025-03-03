@@ -1,0 +1,11 @@
+README.md
+setup.py
+camera_sync/__init__.py
+camera_sync/aruco.py
+camera_sync/calibrate_live_camera.py
+camera_sync/plotting.py
+camera_sync/visualize.py
+camera_sync.egg-info/PKG-INFO
+camera_sync.egg-info/SOURCES.txt
+camera_sync.egg-info/dependency_links.txt
+camera_sync.egg-info/top_level.txt
