@@ -6,20 +6,28 @@ from position import refChange, invertRefChange, Point, Position
 class Aruco:
     corners: list[Position] = None
 
+    @staticmethod
+    def getCornersFromTopLeft(
+        topLeft: np.ndarray[float], size
+    ) -> np.ndarray[np.ndarray[float]]:
+        topLeft
+        topRight = topLeft.copy()
+        topRight[0] += size
+        bottomRight = topLeft.copy()
+        bottomRight[0] += size
+        bottomRight[1] += size
+        bottomLeft = topLeft.copy()
+        bottomLeft[1] += size
+        return np.array([topLeft, topRight, bottomRight, bottomLeft])
+
     def __init__(self, id: int, size: float, topLeft: Position = None):
         self.id = id
         self.size = size
         if topLeft is not None:
-            self.corners = self.setCornersFromTopLeft(topLeft)
-
-    def setCornersFromTopLeft(self, topLeft: Position) -> list[Position]:
-        self.corners = [
-            topLeft,
-            Position(topLeft.x + self.size, topLeft.y, topLeft.z),
-            Position(topLeft.x + self.size, topLeft.y + self.size, topLeft.z),
-            Position(topLeft.x, topLeft.y + self.size, topLeft.z),
-        ]
-        return self.corners
+            self.corners = [
+                Position(*c)
+                for c in Aruco.getCornersFromTopLeft(topLeft.coords, self.size)
+            ]
 
     def getCornersAsList(self) -> list[list[float]]:
         return np.array(
@@ -113,6 +121,11 @@ def detectAruco(
     arucoDict = cv.aruco.getPredefinedDictionary(dictionary_id)
 
     arucoParams = cv.aruco.DetectorParameters()
+    # TODO: We may need to test different methods here to find the most accurate for our case !
+    arucoParams.cornerRefinementMethod = cv.aruco.CORNER_REFINE_SUBPIX
+    arucoParams.cornerRefinementWinSize = 20
+    arucoParams.cornerRefinementMinAccuracy = 0.01
+    arucoParams.cornerRefinementMaxIterations = 100
     (corners, ids, rejected) = cv.aruco.detectMarkers(
         gray, arucoDict, parameters=arucoParams
     )
@@ -129,7 +142,10 @@ def detectAruco(
     return detected, rejected
 
 
-def locateAruco(aruco: Aruco, img_positions: list, camera: Camera):
+def locateAruco(
+    aruco: Aruco, img_positions: list, camera: Camera, metrics: bool = False
+):
+    metrics = {}
 
     assert len(img_positions[0]) == 4
 
@@ -140,9 +156,9 @@ def locateAruco(aruco: Aruco, img_positions: list, camera: Camera):
     rvec = rvecs[0][0]  # Extract the rotation vector
     tvec = tvecs[0][0]  # Extract the translation vector
 
-    topLeft = Position(-aruco.size / 2, -aruco.size / 2, 0)
-
-    aruco.corners = aruco.setCornersFromTopLeft(topLeft)
+    corners = Aruco.getCornersFromTopLeft(
+        np.array([-aruco.size / 2, -aruco.size / 2, 0]), aruco.size
+    )
 
     R, _ = cv.Rodrigues(rvec)
 
@@ -151,11 +167,12 @@ def locateAruco(aruco: Aruco, img_positions: list, camera: Camera):
         pos = invertRefChange(pos, camera.rotation_matrix, camera.tvec)
         return pos
 
-    for i in range(len(aruco.corners)):
-        newPos = convertFromMarkerToWorld(aruco.corners[i].coords)
-        aruco.corners[i] = Position(*newPos)
+    world_corners = []
 
-    return aruco
+    for i, c in enumerate(corners):
+        world_corners.append(convertFromMarkerToWorld(c))
+
+    return world_corners, metrics
 
 
 def processAruco(
@@ -164,7 +181,10 @@ def processAruco(
     camera: Camera,
     img,
     accept_none=False,
+    directUpdate=True,
+    metrics=False,
 ):
+    metrics_collected = {}
     corners_position, rejected = detectAruco(img, debug=False)
     final_image_points = []
     final_obj_points = []
@@ -185,26 +205,35 @@ def processAruco(
     final_image_points = np.array(final_image_points)
     final_obj_points = np.array(final_obj_points)
 
-    rvec, tvec = PnP(
+    rvec, tvec, met = PnP(
         np.array(final_image_points, dtype=np.float32),
         np.array(final_obj_points, dtype=np.float32),
         camera.mtx,
         camera.dist,
+        metrics,
     )
+
+    if metrics:
+        metrics_collected["PnP"] = met
 
     camera.updateWorldPosition(rvec, tvec)
 
-    locatedArucos: dict[int, Aruco] = {}
+    arucosPosition: dict[int, np.ndarray[np.ndarray[float]]] = {}
+
     for a in movingArucos:
         if corners_position.get(a.id) is None:
             continue
         else:
-            locatedArucos[a.id] = locateAruco(a, corners_position[a.id], camera)
+            newCorners, ar_met = locateAruco(a, corners_position[a.id], camera)
+            if directUpdate:
+                for i, c in enumerate(newCorners):
+                    a.corners[i].updatePos(c)
+            arucosPosition[a.id] = newCorners
 
-    return rvec, tvec, locatedArucos
+    return rvec, tvec, arucosPosition, metrics_collected
 
 
-def PnP(image_points, object_points, mtx, dist) -> tuple[list, list]:
+def PnP(image_points, object_points, mtx, dist, getAcc=False) -> tuple[list, list]:
     """
     Estimate the pose of an the camera using PnP.
 
@@ -229,6 +258,67 @@ def PnP(image_points, object_points, mtx, dist) -> tuple[list, list]:
         raise e
 
     if success:
-        return rvec, tvec
+        cv.solvePnPRefineLM(
+            object_points,
+            image_points,
+            mtx,
+            dist,
+            rvec,
+            tvec,
+        )
+        metrics = {}
+        if getAcc:
+            projected, _ = cv.projectPoints(
+                object_points,
+                rvec,
+                tvec,
+                mtx,
+                dist,
+            )
+            projected = projected.squeeze(1)
+
+            distances = np.linalg.norm(projected - image_points, axis=1)
+
+            metrics["AAE"] = np.mean(np.abs(distances))
+
+            metrics["RSE"] = np.sqrt(np.mean(distances**2))
+
+        return rvec, tvec, metrics
     else:
         raise Exception("Could not solve PnP")
+
+
+def processArucoFromMultipleCameras(
+    fixedArucos: list[Aruco],
+    movingArucos: list[Aruco],
+    cameras: list[Camera],
+    frame: list[list],
+    accuracyReport: bool = False,
+    metrics=False,
+):
+    assert len(cameras) == len(frame)
+    # This dict will contains each "variant" of the positions of each arucos corner. One for each time a camera see them
+    arucosPositions: dict[int, list[np.ndarray[np.ndarray[float]]]] = {}
+    for c, f in zip(cameras, frame):
+        res = processAruco(
+            fixedArucos,
+            movingArucos,
+            c,
+            f,
+            accept_none=True,
+            directUpdate=False,
+            metrics=metrics,
+        )
+        if not res:
+            continue
+        rvec, tvec, ap, met = res
+        for key in ap.keys():
+            if key not in arucosPositions:
+                arucosPositions[key] = []
+            arucosPositions[key].append(ap[key])
+
+    for a in movingArucos:
+        if a.id in arucosPositions:
+            average_positions = np.mean(arucosPositions[a.id], axis=0)
+            for i, newPos in enumerate(average_positions):
+                a.corners[i].updatePos(newPos)

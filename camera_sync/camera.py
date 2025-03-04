@@ -1,8 +1,11 @@
+import os
 import subprocess
 from time import sleep
 import cv2 as cv
 import numpy as np
 from position import invertRefChange
+from position import Position
+
 
 class Camera:
     deviceId: int
@@ -11,27 +14,60 @@ class Camera:
     dist: np.ndarray
     rvec: np.ndarray
     tvec: np.ndarray
-    world_position: np.ndarray
+    world_position: Position
     rotation_matrix: np.ndarray
+    _focus: int
+    _resolution: tuple[int, int]
 
-    def __init__(self, deviceId, calibrationFile: str = None):
+    def __init__(
+        self,
+        name,
+        deviceId,
+        calibrationFolder: str = "./calibration",
+        focus=0,
+        resolution=(640, 480),
+    ):
+        if not os.path.exists(calibrationFolder):
+            raise Exception(
+                "Calibration folder not found. Searched at " + calibrationFolder
+            )
+        self.calibrationFolder = calibrationFolder
+
+        self.name = name
         self.deviceId = deviceId
-        self.calibrationFile = calibrationFile
+        self.world_position = Position(0, 0, 0)
         self.captureStream = cv.VideoCapture(deviceId)
-        # self.captureStream.set(cv.CAP_PROP_FRAME_WIDTH, 1920)
-        # self.captureStream.set(cv.CAP_PROP_FRAME_HEIGHT, 1080)
-        if calibrationFile is not None:
-            self._loadCalibration(calibrationFile)
+        self._focus = focus
+        self._resolution = resolution
+        subprocess.run(
+            ["v4l2-ctl", "-d", str(self.deviceId), "-c", "focus_automatic_continuous=0"]
+        )
+        sleep(0.5)
+        subprocess.run(
+            ["v4l2-ctl", "-d", str(self.deviceId), "-c", f"focus_absolute={focus}"]
+        )
+        self.captureStream.set(cv.CAP_PROP_FRAME_WIDTH, resolution[0])
+        self.captureStream.set(cv.CAP_PROP_FRAME_HEIGHT, resolution[1])
 
-    def _loadCalibration(self, path):
-        file = np.load(path)
+        if os.path.exists(self.calibrationFilePath):
+            print(f"{self.name} : Found calibration file at {self.calibrationFilePath}")
+            self._loadCalibration()
+        else:
+            print(
+                f"{self.name} : Did not found any calibration file, searched at : {self.calibrationFilePath}"
+            )
+
+    @property
+    def calibrationFilePath(self) -> str:
+        return os.path.join(self.calibrationFolder, self.calibrationFileName)
+
+    def _loadCalibration(self):
+        file = np.load(self.calibrationFilePath)
         self.mtx = file["mtx"]
         self.dist = file["dist"]
         return file["mtx"], file["dist"]
 
-
-
-    def calibrateWithLiveFeed(self, pointsToFind=(7,7), filePath = None):
+    def calibrateWithLiveFeed(self, pointsToFind=(7, 7)):
         """
         Calibrate a camera from a live camera feed
 
@@ -39,27 +75,15 @@ class Camera:
         cameraId - The id of the camera to calibrate
         """
 
-        if filePath is None:
-            filePath = "./calibration/new_calibration.npz"
-
-        # Initialize the camera
-        subprocess.run(
-            ["v4l2-ctl", "-d", str(self.deviceId), "-c", "focus_automatic_continuous=0"]
-        )
-        sleep(0.5)
-        subprocess.run(["v4l2-ctl", "-d", str(self.deviceId), "-c", "focus_absolute=30"])
-
-        # camera.set(cv.CAP_PROP_FRAME_WIDTH, 1920)
-        # camera.set(cv.CAP_PROP_FRAME_HEIGHT, 1080)
-
         done = False
 
         frames = []
 
-        print("Press 'c' to capture a frame, 's' to save the calibration to a file or 'q' to quit")
+        print(
+            "Press 'c' to capture a frame, 's' to save the calibration to a file or 'q' to quit"
+        )
 
         while not done:
-
             ret, frame = self.captureStream.read()
 
             if not ret:
@@ -71,24 +95,33 @@ class Camera:
             if key == ord("q"):
                 break
             elif key == ord("s"):
-                self.saveCalibration(filePath)
+                self.saveCalibration()
                 break
             elif key == ord("c"):
                 frames.append(frame)
                 print("Frame added to calibration")
-                self.calibrate(frames, (7, 7))
+                self.calibrate(frames, pointsToFind)
 
-    
-    def saveCalibration(self, filePath:str):
+    @property
+    def calibrationFileName(self) -> str:
+        return (
+            f"{self.name}_{self._resolution[0]}-{self._resolution[1]}_{self._focus}.npz"
+        )
+
+    def saveCalibration(self):
         """
         Save the current camera calibration to a file for futur use
 
         Args:
-            filePath: The path to the file to save the calibration to 
+            filePath: The path to the file to save the calibration to
         """
 
-        np.savez(filePath, mtx=self.mtx, dist=self.dist)
-        print(f"Calibration done. Calibration matrix saved in {filePath}")
+        np.savez(
+            self.calibrationFilePath,
+            mtx=self.mtx,
+            dist=self.dist,
+        )
+        print(f"Calibration file saved in {self.calibrationFilePath}")
 
     def calibrate(self, pics, pointsToFind=(7, 7)):
         """
@@ -106,7 +139,9 @@ class Camera:
 
         # prepare object points, like (0,0,0), (1,0,0), (2,0,0) ....,(6,5,0)
         objp = np.zeros((pointsToFind[0] * pointsToFind[1], 3), np.float32)
-        objp[:, :2] = np.mgrid[0 : pointsToFind[0], 0 : pointsToFind[1]].T.reshape(-1, 2)
+        objp[:, :2] = np.mgrid[0 : pointsToFind[0], 0 : pointsToFind[1]].T.reshape(
+            -1, 2
+        )
 
         # Arrays to store object points and image points from all the images.
         objpoints = []  # 3d point in real world space
@@ -152,8 +187,8 @@ class Camera:
         self.rvec = rvec
         self.tvec = tvec.flatten()
         self.rotation_matrix, _ = cv.Rodrigues(rvec)
-        self.world_position = invertRefChange(
-            np.array([0.0, 0.0, 0.0]), self.rotation_matrix, self.tvec
+        self.world_position.updatePos(
+            invertRefChange(np.array([0.0, 0.0, 0.0]), self.rotation_matrix, self.tvec)
         )
         return self.world_position, self.rotation_matrix
 
@@ -182,7 +217,6 @@ def undistort(camera: Camera, img):
     return dst
 
 if __name__ == "__main__":
-    camera = Camera(2)
+    camera = Camera("Logitec_A", 2, focus=0, resolution=(1280, 720))
     camera.calibrateWithLiveFeed()
-    camera.saveCalibration("./calib.npz")
     cv.destroyAllWindows()

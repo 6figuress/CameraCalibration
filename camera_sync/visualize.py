@@ -1,8 +1,17 @@
 import cv2 as cv
 import open3d as o3d
-from aruco import Aruco, processAruco
+from aruco import Aruco, processAruco, processArucoFromMultipleCameras
 from camera import Camera
 from position import Position
+
+
+def applyToMeshes(anchorMeshes, movingMeshes, camerasCubes, func):
+    for m in movingMeshes.values():
+        for c in m:
+            func(c)
+
+    for m in list(anchorMeshes.values()) + camerasCubes:
+        func(m)
 
 
 def initVisualization(
@@ -19,7 +28,10 @@ def initVisualization(
     Returns:
         tuple: Tuple containing the visualization object, the base markers meshes, the moving markers meshes and the cameras cubes
     """
-    cube_size = 30
+    camera_size = 30
+    camera_color = [0, 0, 1]
+    corner_color = [0, 1, 0]
+    corner_size = 10
     baseMarkersMeshes = {}
     movingMarkersMeshes = {}
 
@@ -33,11 +45,20 @@ def initVisualization(
         mesh.compute_vertex_normals()
         return mesh
 
+    def createCube(pos, size, color):
+        cube = o3d.geometry.TriangleMesh.create_box(size, size, size)
+        cube.paint_uniform_color(color)  # Purple
+        cube.compute_vertex_normals()
+        cube.translate(pos)
+        return cube
+
     for a in baseMarkers.values():
         baseMarkersMeshes[a.id] = createMesh(a.getCornersAsList())
 
     for a in movingMarker.values():
-        movingMarkersMeshes[a.id] = createMesh(a.getCornersAsList(), [0.0, 1.0, 0.0])
+        movingMarkersMeshes[a.id] = [
+            createCube(initialPosition, corner_size, corner_color) for i in range(4)
+        ]
 
     vis = o3d.visualization.Visualizer()
     vis.create_window()
@@ -45,18 +66,14 @@ def initVisualization(
     camerasCube = []
 
     for c in cameras:
-        cube = o3d.geometry.TriangleMesh.create_box(cube_size, cube_size, cube_size)
-        cube.paint_uniform_color([0.8, 0.5, 0.5])  # Purple
-        cube.compute_vertex_normals()
-        cube.translate(initialPosition)
-        camerasCube.append(cube)
+        camerasCube.append(createCube(initialPosition, camera_size, camera_color))
 
-    for m in (
-        list(baseMarkersMeshes.values())
-        + list(movingMarkersMeshes.values())
-        + camerasCube
-    ):
-        vis.add_geometry(m)
+    applyToMeshes(
+        baseMarkersMeshes,
+        movingMarkersMeshes,
+        camerasCube,
+        lambda x: vis.add_geometry(x),
+    )
 
     ctl = vis.get_view_control()
     ctl.set_constant_z_far(1000000)
@@ -86,42 +103,29 @@ def locateCamera(
     )
 
     while True:
-        for i, camera in enumerate(cameras):
-            ret, frame = camera.captureStream.read()
+        frames = []
+        for c in cameras:
+            ret, frame = c.captureStream.read()
             if not ret:
-                continue
+                raise Exception("Aha ?")
+            frames.append(frame)
+        processArucoFromMultipleCameras(
+            fixedMarkers.values(), movingMarkers.values(), cameras, frames
+        )
 
-            res = processAruco(
-                fixedMarkers.values(),
-                movingMarkers.values(),
-                camera,
-                frame,
-                accept_none=True,
-            )
+        for m in movingMarkers.values():
+            for j, c in enumerate(movingMarkersMeshes[m.id]):
+                c.translate(m.corners[j].coords, relative=False)
 
-            if not res:
-                # Camera position could not be found
-                continue
+        for i, c in enumerate(cameras):
+            camerasCube[i].translate(c.world_position.coords, relative=False)
 
-            locatedArucos = res[2]
-
-            if i == 0:
-                for id in locatedArucos.keys():
-                    # This is a hack to position the aruco marker almost correctly
-                    # TODO: Fix this by finding a nice way to move the marker (maybe tvec and rvec ?)
-                    pos = locatedArucos[id].corners[0].coords
-                    pos[0] += locatedArucos[id].size / 2
-                    pos[1] -= locatedArucos[id].size / 2
-                    movingMarkersMeshes[id].translate(pos, relative=False)
-
-            camerasCube[i].translate(camera.world_position, relative=False)
-
-        for m in (
-            list(baseMarkersMeshes.values())
-            + list(movingMarkersMeshes.values())
-            + camerasCube
-        ):
-            vis.update_geometry(m)
+        applyToMeshes(
+            baseMarkersMeshes,
+            movingMarkersMeshes,
+            camerasCube,
+            lambda x: vis.update_geometry(x),
+        )
         vis.poll_events()
         vis.update_renderer()
 
@@ -129,14 +133,28 @@ def locateCamera(
 if __name__ == "__main__":
     cameras = [
         # Camera(0, "calibration/integrated_full.npz"),
-        Camera(2, "calibration/logitec_2_f30.npz"),
-        # Camera(4, "calibration/logitec_4_f30.npz"),
+        Camera(
+            "Logitec_A",
+            2,
+            focus=0,
+            resolution=(1280, 720),
+        ),
+        Camera(
+            "Logitec_B",
+            4,
+            focus=0,
+            resolution=(1280, 720),
+        ),
     ]
 
     # Positions are in mm
     # Those dimensions and positions match the ones present in the inkscape file located in ./inkscape/10_to_15.svg
     # The origin is then placed in the top left corner of the paper
     arucos: dict[int, Aruco] = {
+        1: Aruco(1, size=27, topLeft=Position(0, 0, 0)),
+        2: Aruco(2, size=27, topLeft=Position(0, 0, 0)),
+        3: Aruco(3, size=27, topLeft=Position(0, 0, 0)),
+        0: Aruco(0, size=27, topLeft=Position(0, 0, 0)),
         10: Aruco(10, size=80, topLeft=Position(10, 15, 0)),
         11: Aruco(11, size=80, topLeft=Position(120, 15, 0)),
         12: Aruco(12, size=80, topLeft=Position(10, 110, 0)),
@@ -145,13 +163,13 @@ if __name__ == "__main__":
         15: Aruco(15, size=80, topLeft=Position(120, 205, 0)),
     }
 
-    fixed = [10, 11, 14, 15]
-    moving = [12, 13]
+    achors = [10, 11, 14, 15]
+    moving = [12, 13, 0, 1, 2, 3]
     fixedMarkers = {}
 
     movingMarkers = {}
 
-    for i in fixed:
+    for i in achors:
         fixedMarkers[i] = arucos[i]
 
     for i in moving:
