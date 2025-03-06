@@ -2,6 +2,8 @@ import cv2 as cv
 import numpy as np
 from camera import Camera
 from position import refChange, invertRefChange, Point, Position
+from itertools import combinations
+
 
 class Aruco:
     corners: list[Position] = None
@@ -49,6 +51,21 @@ class Aruco:
     @property
     def isLocated(self) -> bool:
         return self.corners is not None
+
+
+def getArucosFromPaper() -> dict[int, Aruco]:
+    return {
+        1: Aruco(1, size=27, topLeft=Position(0, 0, 0)),
+        2: Aruco(2, size=27, topLeft=Position(0, 0, 0)),
+        3: Aruco(3, size=27, topLeft=Position(0, 0, 0)),
+        0: Aruco(0, size=27, topLeft=Position(0, 0, 0)),
+        10: Aruco(10, size=80, topLeft=Position(10, 15, 0)),
+        11: Aruco(11, size=80, topLeft=Position(120, 15, 0)),
+        12: Aruco(12, size=80, topLeft=Position(10, 110, 0)),
+        13: Aruco(13, size=80, topLeft=Position(120, 110, 0)),
+        14: Aruco(14, size=80, topLeft=Position(10, 205, 0)),
+        15: Aruco(15, size=80, topLeft=Position(120, 205, 0)),
+    }
 
 
 def generate_aruco_marker(
@@ -233,7 +250,7 @@ def processAruco(
     return rvec, tvec, arucosPosition, metrics_collected
 
 
-def PnP(image_points, object_points, mtx, dist, getAcc=False) -> tuple[list, list]:
+def PnP(image_points, object_points, mtx, dist, getMetrics=False) -> tuple[list, list]:
     """
     Estimate the pose of an the camera using PnP.
 
@@ -267,7 +284,7 @@ def PnP(image_points, object_points, mtx, dist, getAcc=False) -> tuple[list, lis
             tvec,
         )
         metrics = {}
-        if getAcc:
+        if getMetrics:
             projected, _ = cv.projectPoints(
                 object_points,
                 rvec,
@@ -293,8 +310,7 @@ def processArucoFromMultipleCameras(
     movingArucos: list[Aruco],
     cameras: list[Camera],
     frame: list[list],
-    accuracyReport: bool = False,
-    metrics=False,
+    getMetrics=False,
 ):
     assert len(cameras) == len(frame)
     # This dict will contains each "variant" of the positions of each arucos corner. One for each time a camera see them
@@ -307,7 +323,7 @@ def processArucoFromMultipleCameras(
             f,
             accept_none=True,
             directUpdate=False,
-            metrics=metrics,
+            metrics=getMetrics,
         )
         if not res:
             continue
@@ -317,8 +333,32 @@ def processArucoFromMultipleCameras(
                 arucosPositions[key] = []
             arucosPositions[key].append(ap[key])
 
+
     for a in movingArucos:
         if a.id in arucosPositions:
+            if getMetrics:
+                nbrDims = 3  # We're in 3d
+                nbrCorner = 4  # We have 4 corners for now
+
+                arr = np.array(arucosPositions[a.id])
+                # Get all unique pairs of indices
+                indices = list(combinations(range(len(arr)), 2))
+
+                # Compute differences for unique pairs
+                diffs = np.array([arr[i] - arr[j] for i, j in indices])
+
+                vals = np.square(diffs) / len(arr)  # val ** 2 / nbr_of_observed_values
+
+                err = np.sum(
+                    vals, axis=0
+                )  # This gives us an error per coordinate per corner for this aruco marker
+
+                err = np.sum(err, axis=0) / nbrCorner  # This gives us an error per axes
+
+                RMSE_per_axes = np.sqrt(err)
+
+                RMSE_total = np.sum(RMSE_per_axes) / nbrDims
+
             average_positions = np.mean(arucosPositions[a.id], axis=0)
             for i, newPos in enumerate(average_positions):
                 a.corners[i].updatePos(newPos)

@@ -1,6 +1,11 @@
 import cv2 as cv
 import open3d as o3d
-from aruco import Aruco, processAruco, processArucoFromMultipleCameras
+from aruco import (
+    Aruco,
+    getArucosFromPaper,
+    processAruco,
+    processArucoFromMultipleCameras,
+)
 from camera import Camera
 from position import Position
 
@@ -150,6 +155,9 @@ if __name__ == "__main__":
     # Positions are in mm
     # Those dimensions and positions match the ones present in the inkscape file located in ./inkscape/10_to_15.svg
     # The origin is then placed in the top left corner of the paper
+
+    arucos = getArucosFromPaper()
+
     arucos: dict[int, Aruco] = {
         1: Aruco(1, size=27, topLeft=Position(0, 0, 0)),
         2: Aruco(2, size=27, topLeft=Position(0, 0, 0)),

@@ -3,19 +3,22 @@ import subprocess
 from time import sleep
 import cv2 as cv
 import numpy as np
+from referential import Transform
 from position import invertRefChange
 from position import Position
+from cv2.typing import MatLike, Vec3f
 
 
 class Camera:
     deviceId: int
     captureStream: cv.VideoCapture
-    mtx: np.ndarray
-    dist: np.ndarray
-    rvec: np.ndarray
-    tvec: np.ndarray
+    mtx: MatLike
+    dist: MatLike
+    rvec: Vec3f
+    tvec: Vec3f
     world_position: Position
-    rotation_matrix: np.ndarray
+    rotation_matrix: MatLike
+    world2cam: Transform
     _focus: int
     _resolution: tuple[int, int]
 
@@ -34,20 +37,28 @@ class Camera:
         self.calibrationFolder = calibrationFolder
 
         self.name = name
-        self.deviceId = deviceId
+
+        if deviceId != -1:
+            self.deviceId = deviceId
+            self.captureStream = cv.VideoCapture(deviceId)
+            subprocess.run(
+                [
+                    "v4l2-ctl",
+                    "-d",
+                    str(self.deviceId),
+                    "-c",
+                    "focus_automatic_continuous=0",
+                ]
+            )
+            sleep(0.5)
+            subprocess.run(
+                ["v4l2-ctl", "-d", str(self.deviceId), "-c", f"focus_absolute={focus}"]
+            )
+            self.captureStream.set(cv.CAP_PROP_FRAME_WIDTH, resolution[0])
+            self.captureStream.set(cv.CAP_PROP_FRAME_HEIGHT, resolution[1])
         self.world_position = Position(0, 0, 0)
-        self.captureStream = cv.VideoCapture(deviceId)
         self._focus = focus
         self._resolution = resolution
-        subprocess.run(
-            ["v4l2-ctl", "-d", str(self.deviceId), "-c", "focus_automatic_continuous=0"]
-        )
-        sleep(0.5)
-        subprocess.run(
-            ["v4l2-ctl", "-d", str(self.deviceId), "-c", f"focus_absolute={focus}"]
-        )
-        self.captureStream.set(cv.CAP_PROP_FRAME_WIDTH, resolution[0])
-        self.captureStream.set(cv.CAP_PROP_FRAME_HEIGHT, resolution[1])
 
         if os.path.exists(self.calibrationFilePath):
             print(f"{self.name} : Found calibration file at {self.calibrationFilePath}")
@@ -183,10 +194,13 @@ class Camera:
 
         return mtx, dist
 
-    def updateWorldPosition(self, rvec, tvec):
+    def updateWorldPosition(self, rvec: Vec3f, tvec: Vec3f) -> tuple[Vec3f, MatLike]:
         self.rvec = rvec
         self.tvec = tvec.flatten()
         self.rotation_matrix, _ = cv.Rodrigues(rvec)
+
+        self.world2cam = Transform(rvec=rvec, tvec=tvec)
+
         self.world_position.updatePos(
             invertRefChange(np.array([0.0, 0.0, 0.0]), self.rotation_matrix, self.tvec)
         )
@@ -215,6 +229,7 @@ def undistort(camera: Camera, img):
     x, y, w, h = roi
     dst = dst[y : y + h, x : x + w]
     return dst
+
 
 if __name__ == "__main__":
     camera = Camera("Logitec_A", 2, focus=0, resolution=(1280, 720))
