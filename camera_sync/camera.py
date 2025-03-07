@@ -237,6 +237,6 @@ class Camera:
 
 
 if __name__ == "__main__":
-    camera = Camera("Logitec_A", 2, focus=0, resolution=(1280, 720))
+    camera = Camera("Logitec_A", 4, focus=0, resolution=(1280, 720))
     camera.calibrateWithLiveFeed()
     cv.destroyAllWindows()

@@ -1,61 +1,63 @@
+from time import sleep
 import numpy as np
+import cv2 as cv
+from referential import Transform
+from aruco import Aruco, getArucosFromPaper, processAruco
+from scipy.spatial.transform import Rotation as R
+from position import Position
+from camera import Camera
+from plotting import vizPoses
+import mathutils
 import bpy
 
-from aruco import Aruco
-from position import Position
-
-arucos: dict[int, Aruco] = {
-    10: Aruco(10, size=80, topLeft=Position(10, 15, 0)),
-    11: Aruco(11, size=80, topLeft=Position(120, 15, 0)),
-    # 12: Aruco(12, size=80, topLeft=Position(10, 110, 0)),
-    13: Aruco(13, size=80, topLeft=Position(120, 110, 0)),
-    # 14: Aruco(14, size=80, topLeft=Position(10, 205, 0)),
-    # 15: Aruco(15, size=80, topLeft=Position(120, 205, 0)),
-}
+arucos: dict[int, Aruco] = getArucosFromPaper()
 
 
-def convertCoordsToBlender(coords: list):
-    newCords = np.array([coords[0], -coords[1], coords[2]]) / 1000
-    return newCords
+def renderFromCamera(camera: Camera, filepath: str = "./blender/base.blend"):
+    bpy.ops.wm.open_mainfile(filepath=filepath)
+
+    base_transf = camera.world2cam.invert
+
+    cam_blender = Transform(tvec=base_transf.tvec * 0.001, rot_mat=base_transf.rot_mat)
+
+    cam_pose = cam_blender.apply(np.array([0, 0, 0]))
+
+    bpy.ops.object.camera_add(location=cam_pose)
+    cam = bpy.context.object
+
+    bpy.context.scene.camera = cam
+    # camera properties
+    bpy.data.scenes["Scene"].camera.data.angle_x = 1.2217305
+    bpy.data.scenes["Scene"].camera.data.angle_y = 0.7504916
+    bpy.data.scenes["Scene"].camera.data.lens_unit = "FOV"
+
+    bpy.data.scenes["Scene"].camera.rotation_mode = "QUATERNION"
+    bpy.data.scenes["Scene"].camera.rotation_quaternion = camera.world2cam.quat
+
+    bpy.ops.object.light_add(type="POINT", location=(0, 0, 5))
+
+    # Set render resolution (optional)
+    bpy.context.scene.render.resolution_x = camera._resolution[0]
+    bpy.context.scene.render.resolution_y = camera._resolution[1]
+
+    # Set the render output path
+    bpy.context.scene.render.filepath = "./blender/rendered_image.png"
+
+    # Render the image
+    bpy.ops.render.render(write_still=True)
+
+    bpy.ops.wm.save_as_mainfile(filepath="./blender/test.blend")
 
 
-def convertToBlender(arcuo: Aruco):
-    center = arcuo.getCenter().coords
-    return convertCoordsToBlender(center)
+logi_a = Camera("Logitec_A", 4, focus=0, resolution=(1280, 720))
+
+sleep(1)
+
+frame = logi_a.takePic()
+
+cv.imwrite("./blender/base.png", frame)
 
 
-bpy.ops.object.select_all(action="SELECT")
-bpy.ops.object.delete()
+rvec, tvec, _, _ = processAruco(arucos.values(), [], logi_a, frame)
 
-for a in arucos.values():
-    pos = convertToBlender(a)
-    bpy.ops.mesh.primitive_plane_add(
-        size=a.size / 1000,
-        enter_editmode=False,
-        location=(pos[0], pos[1], pos[2]),
-    )
-
-bpy.ops.mesh.primitive_cube_add(
-    size=0.01,
-    location=convertCoordsToBlender([455.06650962, 430.20372182, -387.0078202]),
-)
-
-# Add a camera
-bpy.ops.object.camera_add(location=(-5, 5, 5))
-camera = bpy.context.object
-
-camera.rotation_euler = (-1.0093, -0.0, -0.854)  # Adjust the rotation if needed
-
-bpy.context.scene.camera = camera
-
-bpy.ops.object.light_add(type="POINT", location=(0, 0, 5))
-
-# Set render resolution (optional)
-bpy.context.scene.render.resolution_x = 1920
-bpy.context.scene.render.resolution_y = 1080
-
-# Set the render output path
-bpy.context.scene.render.filepath = "./rendered_image.png"
-
-# Render the image
-bpy.ops.render.render(write_still=True)
+renderFromCamera(logi_a)

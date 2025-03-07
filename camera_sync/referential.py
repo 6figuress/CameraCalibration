@@ -1,7 +1,8 @@
 import numpy as np
 import cv2 as cv
-from cv2.typing import MatLike, Vec3f
+from cv2.typing import MatLike, Vec3f, Vec4f
 from typing import Self
+from scipy.spatial.transform import Rotation as R
 
 
 class Transform:
@@ -25,10 +26,19 @@ class Transform:
             self._transf_mat = transf_mat
         else:
             raise Exception("Couldn't create transform, not enough information given.")
+        self._preCompute()
+
+    def _preCompute(self):
+        self._rvec = cv.Rodrigues(self.rot_mat)[0]
+        self._quat = R.from_matrix(self.rot_mat).as_quat(scalar_first=False)
 
     @property
     def transf_mat(self) -> MatLike:
         return self._transf_mat
+
+    @property
+    def quat(self) -> Vec4f:
+        return self._quat
 
     @property
     def rot_mat(self) -> MatLike:
@@ -36,18 +46,18 @@ class Transform:
 
     @property
     def rvec(self) -> Vec3f:
-        rvec, _ = cv.Rodrigues(self.rot_mat)
-        return rvec
+        return self._rvec
 
     @property
     def tvec(self) -> Vec3f:
         return self.transf_mat[:3, 3]
 
-    def apply(self, point: Vec3f) -> Vec3f:
-        return point @ self.rot_mat + self.tvec
-
+    @property
     def invert(self) -> Self:
         return Transform(transf_mat=np.linalg.inv(self.transf_mat))
+
+    def apply(self, point: Vec3f) -> Vec3f:
+        return point @ self.rot_mat + self.tvec
 
     def combine(self, t: Self) -> Self:
         return Transform(transf_mat=self.transf_mat @ t.transf_mat)
