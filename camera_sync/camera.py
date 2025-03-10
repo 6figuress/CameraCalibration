@@ -40,20 +40,31 @@ class Camera:
 
         if deviceId != -1:
             self.deviceId = deviceId
-            self.captureStream = cv.VideoCapture(deviceId)
-            subprocess.run(
-                [
-                    "v4l2-ctl",
-                    "-d",
-                    str(self.deviceId),
-                    "-c",
-                    "focus_automatic_continuous=0",
-                ]
-            )
-            sleep(0.5)
-            subprocess.run(
-                ["v4l2-ctl", "-d", str(self.deviceId), "-c", f"focus_absolute={focus}"]
-            )
+
+            if os.name == "nt": # Windows
+                # Not specifying the apiPreference on windows will cause the camera not to work
+                # Also v4l2-ctl is not available on windows
+                self.captureStream = cv.VideoCapture(deviceId, apiPreference=cv.CAP_DSHOW)
+                self.captureStream.set(cv.CAP_PROP_AUTOFOCUS, 0)
+                # focus from 0 to 255, by increments of 5 (https://stackoverflow.com/a/42819965/7619126)
+                self.captureStream.set(cv.CAP_PROP_FOCUS, round(max(0, min(100, focus)) * 255 / 100 / 5) * 5)
+            else:
+                self.captureStream = cv.VideoCapture(deviceId)
+
+                subprocess.run(
+                    [
+                        "v4l2-ctl",
+                        "-d",
+                        str(self.deviceId),
+                        "-c",
+                        "focus_automatic_continuous=0",
+                    ]
+                )
+                sleep(0.5)
+                subprocess.run(
+                    ["v4l2-ctl", "-d", str(self.deviceId), "-c", f"focus_absolute={focus}"]
+                )
+
             self.captureStream.set(cv.CAP_PROP_FRAME_WIDTH, resolution[0])
             self.captureStream.set(cv.CAP_PROP_FRAME_HEIGHT, resolution[1])
         self.world_position = Position(0, 0, 0)

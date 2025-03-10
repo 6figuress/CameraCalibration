@@ -144,9 +144,15 @@ def detectAruco(
     arucoParams.cornerRefinementWinSize = 20
     arucoParams.cornerRefinementMinAccuracy = 0.01
     arucoParams.cornerRefinementMaxIterations = 100
-    (corners, ids, rejected) = cv.aruco.detectMarkers(
-        gray, arucoDict, parameters=arucoParams
-    )
+    
+    # TODO: no idea why only one of the two is available on some systems on the same version of opencv
+    if hasattr(cv.aruco, "detectMarkers"):
+        (corners, ids, rejected) = cv.aruco.detectMarkers(
+            gray, arucoDict, parameters=arucoParams
+        )
+    else:
+        detector = cv.aruco.ArucoDetector(arucoDict, arucoParams)
+        (corners, ids, rejected) = detector.detectMarkers(gray)
 
     if ids is None:
         if debug:
