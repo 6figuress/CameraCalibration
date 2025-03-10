@@ -30,7 +30,7 @@ class Transform:
 
     def _preCompute(self):
         self._rvec = cv.Rodrigues(self.rot_mat)[0]
-        self._quat = R.from_matrix(self.rot_mat).as_quat(scalar_first=False)
+        self._quat = R.from_matrix(self.rot_mat).as_quat(scalar_first=True)
 
     @property
     def transf_mat(self) -> MatLike:

@@ -7,7 +7,6 @@ from scipy.spatial.transform import Rotation as R
 from position import Position
 from camera import Camera
 from plotting import vizPoses
-import mathutils
 import bpy
 
 arucos: dict[int, Aruco] = getArucosFromPaper()
@@ -31,8 +30,14 @@ def renderFromCamera(camera: Camera, filepath: str = "./blender/base.blend"):
     bpy.data.scenes["Scene"].camera.data.angle_y = 0.7504916
     bpy.data.scenes["Scene"].camera.data.lens_unit = "FOV"
 
+    # Apply 180edg X-axis rotation to align OpenCV's coordinate system (Z forward, Y down, X right) 
+    # with Blender's coordinate system (Z forward, Y up, X right)
+    cv_to_blender = R.from_euler("x", 180, degrees=True).as_matrix()
+    blend_rot_mat = base_transf.rot_mat @ cv_to_blender 
+    blend_quat = R.from_matrix(blend_rot_mat).as_quat(scalar_first=True)
+
     bpy.data.scenes["Scene"].camera.rotation_mode = "QUATERNION"
-    bpy.data.scenes["Scene"].camera.rotation_quaternion = camera.world2cam.quat
+    bpy.data.scenes["Scene"].camera.rotation_quaternion = blend_quat 
 
     bpy.ops.object.light_add(type="POINT", location=(0, 0, 5))
 
