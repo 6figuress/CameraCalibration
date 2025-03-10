@@ -66,8 +66,8 @@ def getPosesPics():
     pics = []
 
     for i, f in enumerate(sorted(os.listdir(folderPath))):
-        if i < 3:
-            return
+        if i > 3:
+            break
         pics.append(cv.imread(os.path.join(folderPath, f)))
 
     return pics
@@ -79,21 +79,27 @@ def debug_mat(transforms: list[Transform]):
 
     length = 100
 
+    # Those are to print the tool direction
     directions = [
         [0, 0, length],
-        [0, 0, -length],
-        [0, length, 0],
-        [0, -length, 0],
-        [length, 0, 0],
-        [-length, 0, 0],
+        # [0, 0, -length],
+        # [0, length, 0],
+        # [0, -length, 0],
+        # [length, 0, 0],
+        # [-length, 0, 0],
     ]
 
-    colors = ["r", "r", "g", "g", "b", "b"]
+    colors = [
+        # "r",
+        "b",
+        # "g",
+        # "g",
+        # "b",
+        # "b",
+    ]
 
     for i, t in enumerate(transforms):
         ax.scatter(*t.tvec, s=100, label=f"Position : {i}")
-
-        # Plot orientation using quiver (arrows)
 
         for d, c in zip(directions, colors):
             newPoint = t.apply(d)
@@ -108,8 +114,8 @@ def debug_mat(transforms: list[Transform]):
     ax.set_ylabel("Y")
     ax.set_zlabel("Z")
     ax.set_xlim((-500, 500))
-    ax.set_ylim((-500, 500))
-    ax.set_zlim((-500, 500))
+    ax.set_ylim((-500, 100))
+    ax.set_zlim((0, 500))
 
     plt.legend()
 
@@ -136,7 +142,32 @@ camera_world_rvecs = []
 camera_world_tvecs = []
 
 
+# Those are data from Sebastien - Not corresponding to any pictures
+translation_data = [
+    # [-93.14, -291.73, -210.34],
+    # [-53.87, -349.20, -193.23],
+    # [-110.15, -348.84, -192.95],
+    # [-54.15, -297.68, -193.44],
+    # [-104.76, -298.16, -193.99],
+    # Real world data
+    [-244.32, -128.5, -119.5],
+    [46.43, -217.58, -83.53],
+    [-385.26, -79.67, -178.37],
+    [-208.78, -437.98, -58.25],
+    # # [224.5, -337.9, -217.5],
+    # [-260.7, 69.5, -140.6],
+    # [-472.5, -22.6, -268.0],
+    # [334.8, -235.2, -210.9],
+]
+
+
 rotation_data = [
+    # [2.193, 2.209, 0.012],
+    # [2.409, 2.017, 0.000],
+    # [2.409, 2.017, 0.0],
+    # [2.399, 2.029, 0.000],
+    # [2.399, 2.028, -0.000],
+    # Real world data,
     [3.720, -0.023, 0.099],
     [2.000, -1.975, -0.091],
     [2.990, 0.704, 0.006],
@@ -146,17 +177,40 @@ rotation_data = [
     # [2.345, 1.133, -0.401],
     # [2.075, -1.724, -0.071],
 ]
-translation_data = [
-    [-244.32, -128.5, -119.5],
-    [46.43, -217.58, -83.53],
-    [-385.26, -79.67, -178.37],
-    [-208.78, -437.98, -58.25],
-    # [224.5, -337.9, -217.5],
-    # [-260.7, 69.5, -140.6],
-    # [-472.5, -22.6, -268.0],
-    # [334.8, -235.2, -210.9],
-]
 
+
+test_transf = Transform(
+    rot_mat=np.array(
+        [
+            [-1.0, 0.0, 0.0],
+            [0.0, 1.0, 0.0],
+            [0.0, 0.0, 1.0],
+        ]
+    ),
+    tvec=[0.0, 0.0, 0.0],
+)
+
+# ==== Real data ====
+# rotation_data = [
+#     # [3.720, -0.023, 0.099],
+#     # [2.000, -1.975, -0.091],
+#     # [2.990, 0.704, 0.006],
+#     # [0.008, -2.904, 0.724],
+#     # [1.739, -2.103, -0.176],
+#     # [2.844, 0.169, 0.018],
+#     # [2.345, 1.133, -0.401],
+#     # [2.075, -1.724, -0.071],
+# ]
+# translation_data = [
+#     # [-244.32, -128.5, -119.5],
+#     # [46.43, -217.58, -83.53],
+#     # [-385.26, -79.67, -178.37],
+#     # [-208.78, -437.98, -58.25],
+#     # [224.5, -337.9, -217.5],
+#     # [-260.7, 69.5, -140.6],
+#     # [-472.5, -22.6, -268.0],
+#     # [334.8, -235.2, -210.9],
+# ]
 
 
 robot_poses = []
@@ -164,15 +218,19 @@ robot_poses = []
 robot_rot_matrices = []
 
 for i, r in enumerate(rotation_data):
-    rot = R.from_euler("xyz", r)
-    robot_rot_matrices.append(rot.as_matrix())
-    robot_poses.append(Transform(tvec=translation_data[i], rot_mat=rot.as_matrix()))
+    rot_mat, _ = cv.Rodrigues(np.array(r))
+    robot_poses.append(
+        Transform(
+            tvec=test_transf.rot_mat @ translation_data[i],
+            rot_mat=test_transf.rot_mat @ rot_mat,
+        )
+    )
 
 
 debug_mat(robot_poses)
 
 
-vizPoses(robot_poses[0])
+# vizPoses(robot_poses[0])
 
 
 t_base2gripper = np.array([t.tvec for t in robot_poses])
@@ -192,11 +250,16 @@ for p in pics:
 camera_world_poses = [p.invert() for p in camera_poses]
 
 
+import ipdb
+
+ipdb.set_trace()
+
 rot_base2world, tvec_base2world, rot_grip2cam, tvec_grip2cam = (
     cv.calibrateRobotWorldHandEye(
         camera_world_rvecs, camera_world_tvecs, r_base2gripper, t_base2gripper
     )
 )
+
 
 base2world = Transform(rot_mat=rot_base2world, tvec=tvec_base2world)
 grip2cam = Transform(rot_mat=rot_grip2cam, tvec=tvec_grip2cam)
@@ -216,6 +279,10 @@ def testCalib(
     currStep = grip2cam.apply(currStep)
 
     currStep = cam2world.apply(currStep)
+
+    import ipdb
+
+    ipdb.set_trace()
 
     pass
 

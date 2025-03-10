@@ -59,12 +59,12 @@ def getArucosFromPaper() -> dict[int, Aruco]:
         2: Aruco(2, size=27, topLeft=Position(0, 0, 0)),
         3: Aruco(3, size=27, topLeft=Position(0, 0, 0)),
         0: Aruco(0, size=27, topLeft=Position(0, 0, 0)),
-        10: Aruco(10, size=80, topLeft=Position(10, 15, 0)),
-        11: Aruco(11, size=80, topLeft=Position(120, 15, 0)),
-        12: Aruco(12, size=80, topLeft=Position(10, 110, 0)),
-        13: Aruco(13, size=80, topLeft=Position(120, 110, 0)),
-        14: Aruco(14, size=80, topLeft=Position(10, 205, 0)),
-        15: Aruco(15, size=80, topLeft=Position(120, 205, 0)),
+        10: Aruco(10, size=80, topLeft=Position(10, -15, 0)),
+        11: Aruco(11, size=80, topLeft=Position(120, -15, 0)),
+        12: Aruco(12, size=80, topLeft=Position(10, -110, 0)),
+        13: Aruco(13, size=80, topLeft=Position(120, -110, 0)),
+        14: Aruco(14, size=80, topLeft=Position(10, -205, 0)),
+        15: Aruco(15, size=80, topLeft=Position(120, -205, 0)),
     }
 
 
