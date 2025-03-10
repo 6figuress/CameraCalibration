@@ -65,10 +65,56 @@ def getPosesPics():
 
     pics = []
 
-    for f in sorted(os.listdir(folderPath)):
+    for i, f in enumerate(sorted(os.listdir(folderPath))):
+        if i < 3:
+            return
         pics.append(cv.imread(os.path.join(folderPath, f)))
 
     return pics
+
+
+def debug_mat(transforms: list[Transform]):
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection="3d")
+
+    length = 100
+
+    directions = [
+        [0, 0, length],
+        [0, 0, -length],
+        [0, length, 0],
+        [0, -length, 0],
+        [length, 0, 0],
+        [-length, 0, 0],
+    ]
+
+    colors = ["r", "r", "g", "g", "b", "b"]
+
+    for i, t in enumerate(transforms):
+        ax.scatter(*t.tvec, s=100, label=f"Position : {i}")
+
+        # Plot orientation using quiver (arrows)
+
+        for d, c in zip(directions, colors):
+            newPoint = t.apply(d)
+            ax.plot(
+                [t.tvec[0], newPoint[0]],
+                [t.tvec[1], newPoint[1]],
+                [t.tvec[2], newPoint[2]],
+                color=c,
+            )
+
+    ax.set_xlabel("X")
+    ax.set_ylabel("Y")
+    ax.set_zlabel("Z")
+    ax.set_xlim((-500, 500))
+    ax.set_ylim((-500, 500))
+    ax.set_zlim((-500, 500))
+
+    plt.legend()
+
+    plt.show()
+    pass
 
 
 arucos = getArucosFromPaper()
@@ -95,29 +141,35 @@ rotation_data = [
     [2.000, -1.975, -0.091],
     [2.990, 0.704, 0.006],
     [0.008, -2.904, 0.724],
-    [1.739, -2.103, -0.176],
-    [2.844, 0.169, 0.018],
-    [2.345, 1.133, -0.401],
-    [2.075, -1.724, -0.071],
+    # [1.739, -2.103, -0.176],
+    # [2.844, 0.169, 0.018],
+    # [2.345, 1.133, -0.401],
+    # [2.075, -1.724, -0.071],
 ]
 translation_data = [
     [-244.32, -128.5, -119.5],
     [46.43, -217.58, -83.53],
     [-385.26, -79.67, -178.37],
     [-208.78, -437.98, -58.25],
-    [224.5, -337.9, -217.5],
-    [-260.7, 69.5, -140.6],
-    [-472.5, -22.6, -268.0],
-    [334.8, -235.2, -210.9],
+    # [224.5, -337.9, -217.5],
+    # [-260.7, 69.5, -140.6],
+    # [-472.5, -22.6, -268.0],
+    # [334.8, -235.2, -210.9],
 ]
+
 
 
 robot_poses = []
 
+robot_rot_matrices = []
+
 for i, r in enumerate(rotation_data):
     rot = R.from_euler("xyz", r)
-    rot.as_matrix()
+    robot_rot_matrices.append(rot.as_matrix())
     robot_poses.append(Transform(tvec=translation_data[i], rot_mat=rot.as_matrix()))
+
+
+debug_mat(robot_poses)
 
 
 vizPoses(robot_poses[0])
