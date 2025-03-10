@@ -18,8 +18,11 @@ class Point:
     def y(self) -> float:
         return self.coords[1]
 
-    def updatePos(self, newPos: np.ndarray[float]):
-        self.coords = lowPassFilter(newPos, self.coords, ALPHA)
+    def updatePos(self, newPos: np.ndarray[float], noFilter=False):
+        if noFilter:
+            self.coords = newPos
+        else:
+            self.coords = lowPassFilter(newPos, self.coords, ALPHA)
         # self.coords = newPos
 
 

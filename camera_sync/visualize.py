@@ -144,12 +144,12 @@ if __name__ == "__main__":
             focus=0,
             resolution=(1280, 720),
         ),
-        Camera(
-            "Logitec_B",
-            4,
-            focus=0,
-            resolution=(1280, 720),
-        ),
+        # Camera(
+        #     "Logitec_B",
+        #     4,
+        #     focus=0,
+        #     resolution=(1280, 720),
+        # ),
     ]
 
     # Positions are in mm

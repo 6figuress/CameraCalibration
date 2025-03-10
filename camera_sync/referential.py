@@ -44,10 +44,14 @@ class Transform:
         return self.transf_mat[:3, 3]
 
     def apply(self, point: Vec3f) -> Vec3f:
-        return point @ self.rot_mat + self.tvec
+        return self.rot_mat @ point + self.tvec
 
     def invert(self) -> Self:
-        return Transform(transf_mat=np.linalg.inv(self.transf_mat))
+        Transform(rot_mat=self.rot_mat.T, tvec=-self.rot_mat.T @ self.tvec)
+
+        return Transform(
+            rot_mat=self.rot_mat.T, tvec=-self.rot_mat.T @ self.tvec
+        )  # Transform(transf_mat=np.linalg.inv(self.transf_mat))
 
     def combine(self, t: Self) -> Self:
         return Transform(transf_mat=self.transf_mat @ t.transf_mat)

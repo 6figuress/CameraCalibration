@@ -202,7 +202,8 @@ class Camera:
         self.world2cam = Transform(rvec=rvec, tvec=tvec)
 
         self.world_position.updatePos(
-            invertRefChange(np.array([0.0, 0.0, 0.0]), self.rotation_matrix, self.tvec)
+            invertRefChange(np.array([0.0, 0.0, 0.0]), self.rotation_matrix, self.tvec),
+            noFilter=True,
         )
         return self.world_position, self.rotation_matrix
 
