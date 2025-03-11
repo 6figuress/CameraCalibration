@@ -9,6 +9,7 @@ class Transform:
     _transf_mat: MatLike = None
     _rvec: Vec3f = None
     _inv: Self = None
+    _quat: Vec4f = None
 
     @staticmethod
     def getFromRotationMatrix(rot_mat: MatLike, tvec: Vec3f) -> Self:
@@ -86,6 +87,8 @@ class Transform:
 
     @property
     def quat(self) -> Vec4f:
+        if self._quat is None:
+            self._quat = R.from_matrix(self.rot_mat).as_quat(scalar_first=True)
         return self._quat
 
     @property
