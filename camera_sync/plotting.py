@@ -1,6 +1,61 @@
 import matplotlib.pyplot as plt
+import numpy as np
 
 from .aruco import Aruco
+from .referential import Transform
+
+
+def vizPoses(poses: list[Transform], axis=2):
+    # Create a 3D plot
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection="3d")
+
+    length = 100
+
+    base_axis = np.zeros(3)
+
+    base_axis[axis] = length
+
+    # Iterate over each pair of rvec and tvec
+    for i, p in enumerate(poses):
+        world_axis = p.rot_mat.dot(base_axis)
+        newPoint = p.apply(base_axis)
+        # Convert rvec to rotation matrix
+        R = p.rot_mat
+        tvec = p.tvec
+
+        # Plot the camera position (tvec)
+        ax.scatter(tvec[0], tvec[1], tvec[2], color="k", s=100)
+        ax.scatter(*newPoint, color="g")
+
+        x = [tvec[0], newPoint[0]]
+        y = [tvec[1], newPoint[1]]
+        z = [tvec[2], newPoint[2]]
+
+        ax.plot(x, y, z, color="g")
+
+        # Plot the camera Z-axis direction (world frame)
+        ax.quiver(
+            tvec[0],
+            tvec[1],
+            tvec[2],
+            world_axis[0],
+            world_axis[1],
+            world_axis[2],
+            length=length,
+            normalize=True,
+            label=f"Camera Z-axis Direction {i}",
+        )
+
+    # Set labels and limits for clarity
+    ax.set_xlabel("X")
+    ax.set_ylabel("Y")
+    ax.set_zlabel("Z")
+    ax.set_xlim((-500, 500))
+    ax.set_ylim((-500, 500))
+    ax.set_zlim((-500, 500))
+
+    plt.show()
 
 
 def draw_camera_position(ax, position, rotation):

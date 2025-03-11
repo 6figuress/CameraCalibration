@@ -1,7 +1,8 @@
 import numpy as np
 import cv2 as cv
-from cv2.typing import MatLike, Vec3f
+from cv2.typing import MatLike, Vec3f, Vec4f
 from typing import Self
+from scipy.spatial.transform import Rotation as R
 
 
 class Transform:
@@ -45,10 +46,19 @@ class Transform:
             self._transf_mat = transf_mat
         else:
             raise Exception("Couldn't create transform, not enough information given.")
+        self._preCompute()
+
+    def _preCompute(self):
+        self._rvec = cv.Rodrigues(self.rot_mat)[0]
+        self._quat = R.from_matrix(self.rot_mat).as_quat(scalar_first=True)
 
     @property
     def transf_mat(self) -> MatLike:
         return self._transf_mat
+
+    @property
+    def quat(self) -> Vec4f:
+        return self._quat
 
     @property
     def rot_mat(self) -> MatLike:

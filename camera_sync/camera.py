@@ -99,20 +99,31 @@ class Camera:
         if deviceId != -1:
             # TODO: Replace that with Dimitri's version
             self.deviceId = deviceId
-            self.captureStream = cv.VideoCapture(deviceId)
-            subprocess.run(
-                [
-                    "v4l2-ctl",
-                    "-d",
-                    str(self.deviceId),
-                    "-c",
-                    "focus_automatic_continuous=0",
-                ]
-            )
-            sleep(0.5)
-            subprocess.run(
-                ["v4l2-ctl", "-d", str(self.deviceId), "-c", f"focus_absolute={focus}"]
-            )
+
+            if os.name == "nt": # Windows
+                # Not specifying the apiPreference on windows will cause the camera not to work
+                # Also v4l2-ctl is not available on windows
+                self.captureStream = cv.VideoCapture(deviceId, apiPreference=cv.CAP_DSHOW)
+                self.captureStream.set(cv.CAP_PROP_AUTOFOCUS, 0)
+                # focus from 0 to 255, by increments of 5 (https://stackoverflow.com/a/42819965/7619126)
+                self.captureStream.set(cv.CAP_PROP_FOCUS, round(max(0, min(100, focus)) * 255 / 100 / 5) * 5)
+            else:
+                self.captureStream = cv.VideoCapture(deviceId)
+
+                subprocess.run(
+                    [
+                        "v4l2-ctl",
+                        "-d",
+                        str(self.deviceId),
+                        "-c",
+                        "focus_automatic_continuous=0",
+                    ]
+                )
+                sleep(0.5)
+                subprocess.run(
+                    ["v4l2-ctl", "-d", str(self.deviceId), "-c", f"focus_absolute={focus}"]
+                )
+
             self.captureStream.set(cv.CAP_PROP_FRAME_WIDTH, resolution[0])
             self.captureStream.set(cv.CAP_PROP_FRAME_HEIGHT, resolution[1])
         self.world_position = Position(0, 0, 0)
@@ -143,7 +154,13 @@ class Camera:
         self.dist = file["dist"]
         return file["mtx"], file["dist"]
 
-    def calibrateWithLiveFeed(self, pointsToFind=(7, 7)):
+    def takePic(self):
+        ret, frame = self.captureStream.read()
+        if ret:
+            return frame
+        return ret
+
+    def calibrateWithLiveFeed(self, pointsToFind=(7,7)):
         """
         Calibrate a camera from a live camera feed
 
@@ -244,17 +261,7 @@ class Camera:
         dst = dst[y : y + h, x : x + w]
         return dst
 
-
-def refChange(position: np.ndarray, rot_mat, tvec):
-    return rot_mat @ position + tvec
-
-
-def invertRefChange(position: np.ndarray, rot_mat, tvec):
-    inv_tvec = -rot_mat.T @ tvec
-    return rot_mat.T @ position + inv_tvec
-
-
 if __name__ == "__main__":
-    camera = Camera("Logitec_A", 2, focus=0, resolution=(1280, 720))
+    camera = Camera("Logitec_A", 4, focus=0, resolution=(1280, 720))
     camera.calibrateWithLiveFeed()
     cv.destroyAllWindows()

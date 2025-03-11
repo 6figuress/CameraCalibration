@@ -22,9 +22,9 @@ class Aruco:
         topRight[0] += size
         bottomRight = topLeft.copy()
         bottomRight[0] += size
-        bottomRight[1] += size
+        bottomRight[1] -= size
         bottomLeft = topLeft.copy()
-        bottomLeft[1] += size
+        bottomLeft[1] -= size
         return np.array([topLeft, topRight, bottomRight, bottomLeft])
 
     @property
@@ -48,7 +48,8 @@ class Aruco:
                 self.corners[2].coords,
                 self.corners[3].coords,
             ]
-        )
+        )        
+
 
     def getCenter(self) -> Position:
         return Position(
@@ -148,9 +149,15 @@ def detectAruco(
     arucoParams.cornerRefinementWinSize = 20
     arucoParams.cornerRefinementMinAccuracy = 0.01
     arucoParams.cornerRefinementMaxIterations = 100
-    (corners, ids, rejected) = cv.aruco.detectMarkers(
-        gray, arucoDict, parameters=arucoParams
-    )
+    
+    # TODO: no idea why only one of the two is available on some systems on the same version of opencv
+    if hasattr(cv.aruco, "detectMarkers"):
+        (corners, ids, rejected) = cv.aruco.detectMarkers(
+            gray, arucoDict, parameters=arucoParams
+        )
+    else:
+        detector = cv.aruco.ArucoDetector(arucoDict, arucoParams)
+        (corners, ids, rejected) = detector.detectMarkers(gray)
 
     if ids is None:
         if debug:
