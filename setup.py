@@ -8,4 +8,11 @@ setup(
     python_requires=">=3.10,<3.12",
     author="6 Figures",
     description="A package to allow camera to localize aruco markers in a 3d world",
+    package_data={
+        "camera_sync": [ 
+            "calibration/*",
+            "blender/base.blend",
+            "blender/10_to_15.png",
+        ],
+    }
 )
