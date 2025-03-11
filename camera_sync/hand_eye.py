@@ -180,7 +180,7 @@ grip2cam = Transform(rot_mat=rot_grip2cam, tvec=tvec_grip2cam)
 def testCalib(
     cam: Camera, world2base: Transform, base2grip: Transform, grip2cam: Transform
 ):
-    cam2world = cam.world2cam.invert()
+    cam2world = cam.world2cam.invert
 
     point = np.array([0.0, 0.0, 0.0])
 
@@ -195,4 +195,4 @@ def testCalib(
     import ipdb
     ipdb.set_trace()
 
-testCalib(robot_cam, base2world.invert(), robot_poses[-1], grip2cam)
+testCalib(robot_cam, base2world.invert, robot_poses[-1], grip2cam)

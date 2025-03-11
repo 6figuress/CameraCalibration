@@ -2,16 +2,23 @@ import os
 from time import sleep
 import numpy as np
 import cv2 as cv
-from referential import Transform
-from aruco import Aruco, getArucosFromPaper, processAruco
 from scipy.spatial.transform import Rotation as R
-from camera import Camera
 import bpy
+
+from .tools import getBaseFolder
+from .referential import Transform
+from .aruco import Aruco, getArucosFromPaper, processAruco
+from .camera import Camera
 
 arucos: dict[int, Aruco] = getArucosFromPaper()
 
+BLENDER_FOLDER = os.path.join(getBaseFolder(), "./blender")
 
-def renderFromCamera(camera: Camera, filepath: str = "./blender/base.blend"):
+
+def renderFromCamera(
+    camera: Camera,
+    filepath: str = os.path.join(BLENDER_FOLDER, "base.blend"),
+):
     bpy.ops.wm.open_mainfile(filepath=filepath)
 
     base_transf = camera.world2cam.invert
@@ -40,12 +47,14 @@ def renderFromCamera(camera: Camera, filepath: str = "./blender/base.blend"):
     bpy.context.scene.render.resolution_y = camera._resolution[1]
 
     # Set the render output path
-    bpy.context.scene.render.filepath = "./blender/rendered_image.png"
+    bpy.context.scene.render.filepath = os.path.join(
+        BLENDER_FOLDER, "rendered_image.png"
+    )
 
     # Render the image
     bpy.ops.render.render(write_still=True)
 
-    bpy.ops.wm.save_as_mainfile(filepath="./blender/test.blend")
+    bpy.ops.wm.save_as_mainfile(filepath=os.path.join(BLENDER_FOLDER, "test.blend"))
 
 
 def camera_setup(cam: Camera) -> bpy.types.Object:
@@ -129,11 +138,13 @@ def apply_distortion(cam: Camera) -> None:
 
 
 
+logi_a = Camera("Logitec_A", 2, focus=0, resolution=(1280, 720))
+
 sleep(1)
 
 frame = logi_a.takePic()
 
-cv.imwrite("./blender/base.png", frame)
+cv.imwrite(os.path.join(BLENDER_FOLDER, "base.png"), frame)
 
 
 rvec, tvec, _, _ = processAruco(arucos.values(), [], logi_a, frame)

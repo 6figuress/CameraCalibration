@@ -233,7 +233,7 @@ class Camera:
         self.world2cam = Transform(rvec=rvec, tvec=tvec)
 
         self.world_position.updatePos(
-            self.world2cam.invert().apply([0.0, 0.0, 0.0]), noFilter=noLowPassFilter
+            self.world2cam.invert.apply([0.0, 0.0, 0.0]), noFilter=noLowPassFilter
         )
 
         return self.world_position, self.world2cam.rot_mat

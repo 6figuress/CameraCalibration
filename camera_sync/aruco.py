@@ -192,7 +192,7 @@ def locateAruco(
     )
 
     world_corners = []
-    cam2world = camera.world2cam.invert()
+    cam2world = camera.world2cam.invert
     for i, c in enumerate(corners):
         pos = currTransf.apply(c)
         pos = cam2world.apply(pos)
