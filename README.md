@@ -4,8 +4,10 @@ This repository is used to calibrate a camera, and then use it to locate itself 
 
 ## To install
 
- To install the package and run it directly, you can run `pip install -e .` in this folder. If you want to use this module in another python file, you can target the git folder with the install command, i.e. replace *.* with the path to this folder
+ To install the package and run it directly, you can run `pip install -e <absolute path to folder>` in your python environment.
+
+ If you don't want to use the pre-calbrated files, you can use `pip install git+https://github.com/6figuress/CameraCalibration.git@feature/package` instead
 
 ## Tweaks
 
-If you're using wayland as a render server, you may need to `source ./setup.sh` in order use open3D for vizualisation. This is necessary if you see warnings in the console about some open3d windows that failed to be created
+If you're using wayland as a render server, you may need to run `export XDG_SESSION_TYPE=x11` for it to work

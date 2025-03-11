@@ -1,1 +1,4 @@
-camera_sync/aruco/aruco_*.png
+*egg-info
+*__pycache__
+aruco
+.pytest_cache

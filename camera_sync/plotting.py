@@ -1,5 +1,6 @@
 import matplotlib.pyplot as plt
-from aruco import Aruco
+
+from .aruco import Aruco
 
 
 def draw_camera_position(ax, position, rotation):

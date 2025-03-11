@@ -3,5 +3,10 @@ Name: camera_sync
 Version: 0.1
 Summary: A package to allow camera to localize aruco markers in a 3d world
 Author: 6 Figures
+Requires-Dist: camera_sync
+Requires-Dist: opencv-python
+Requires-Dist: matplotlib
+Requires-Dist: open3d
 Dynamic: author
+Dynamic: requires-dist
 Dynamic: summary
