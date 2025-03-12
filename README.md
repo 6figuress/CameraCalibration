@@ -4,9 +4,9 @@ This repository is used to calibrate a camera, and then use it to locate itself 
 
 ## To install
 
- To install the package and run it directly, you can run `pip install -e <absolute path to folder>` in your python environment.
+To install the package, you can either install it via git directly using `pip install git+https://github.com/6figuress/CameraCalibration.git`
 
- If you don't want to use the pre-calbrated files, you can use `pip install git+https://github.com/6figuress/CameraCalibration.git@feature/package` instead
+Or you can clone the repository in local, and install it via `pip install -e <path to module>`. This method allow you to modifiy the module and test it directly
 
 ## Tweaks
 

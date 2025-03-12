@@ -40,7 +40,7 @@ class Transform:
 
         if tvec is not None and rot_mat is not None:
             self._transf_mat = np.eye(4)
-            self._transf_mat[:3, :3] = rot_mat
+            self._transf_mat[:3, :3] = np.array(rot_mat)
             self._transf_mat[:3, 3] = np.array(tvec).ravel()
         elif transf_mat is not None:
             self._transf_mat = transf_mat

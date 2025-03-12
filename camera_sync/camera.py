@@ -102,27 +102,18 @@ class Camera:
 
             if os.name == "nt": # Windows
                 # Not specifying the apiPreference on windows will cause the camera not to work
-                # Also v4l2-ctl is not available on windows
-                self.captureStream = cv.VideoCapture(deviceId, apiPreference=cv.CAP_DSHOW)
-                self.captureStream.set(cv.CAP_PROP_AUTOFOCUS, 0)
-                # focus from 0 to 255, by increments of 5 (https://stackoverflow.com/a/42819965/7619126)
-                self.captureStream.set(cv.CAP_PROP_FOCUS, round(max(0, min(100, focus)) * 255 / 100 / 5) * 5)
+                self.captureStream = cv.VideoCapture(
+                    deviceId, apiPreference=cv.CAP_DSHOW
+                )
             else:
                 self.captureStream = cv.VideoCapture(deviceId)
 
-                subprocess.run(
-                    [
-                        "v4l2-ctl",
-                        "-d",
-                        str(self.deviceId),
-                        "-c",
-                        "focus_automatic_continuous=0",
-                    ]
-                )
-                sleep(0.5)
-                subprocess.run(
-                    ["v4l2-ctl", "-d", str(self.deviceId), "-c", f"focus_absolute={focus}"]
-                )
+            self.captureStream.set(cv.CAP_PROP_AUTOFOCUS, 0)
+            # focus from 0 to 255, by increments of 5 (https://stackoverflow.com/a/42819965/7619126)
+            self.captureStream.set(
+                cv.CAP_PROP_FOCUS,
+                round(max(0, min(100, focus)) * 255 / 100 / 5) * 5,
+            )
 
             self.captureStream.set(cv.CAP_PROP_FRAME_WIDTH, resolution[0])
             self.captureStream.set(cv.CAP_PROP_FRAME_HEIGHT, resolution[1])
@@ -262,6 +253,6 @@ class Camera:
         return dst
 
 if __name__ == "__main__":
-    camera = Camera("Logitec_A", 4, focus=0, resolution=(1280, 720))
+    camera = Camera("Logitec_A", 0, focus=0, resolution=(1280, 720))
     camera.calibrateWithLiveFeed()
     cv.destroyAllWindows()
