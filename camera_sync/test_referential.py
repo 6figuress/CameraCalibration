@@ -13,11 +13,13 @@ def test_init_with_rvec_tvec():
     """Test initialization with rotation vector and translation vector"""
     rvec = np.array([0.1, 0.2, 0.3])
     tvec = np.array([1.0, 2.0, 3.0])
-    transform = Transform(rvec=rvec, tvec=tvec)
+    transform = Transform.fromRodrigues(rvec=rvec, tvec=tvec)
     
     # Check if tvec is correctly stored
     assert np.allclose(transform.tvec, tvec)
     # Check if rvec is correctly stored
+    print("Rvec is : ", transform.rvec)
+    print("Rvec is ", rvec)
     assert np.allclose(transform.rvec, rvec)
 
 
@@ -25,33 +27,19 @@ def test_init_with_rot_mat_tvec():
     """Test initialization with rotation matrix and translation vector"""
     rot_mat = np.eye(3)
     tvec = np.array([1.0, 2.0, 3.0])
-    transform = Transform(rot_mat=rot_mat, tvec=tvec)
+    transform = Transform.fromRotationMatrix(rot_mat=rot_mat, tvec=tvec)
     
     # Check if transformation matrix is correctly constructed
     expected_transf_mat = np.eye(4)
     expected_transf_mat[:3, 3] = tvec
     assert np.array_equal(transform.transf_mat, expected_transf_mat)
 
-
-def test_init_error_cases():
-    """Test initialization error cases"""
-    # Test when both rvec and rot_mat are provided
-    with pytest.raises(Exception) as excinfo:
-        Transform(rvec=[0.1, 0.2, 0.3], rot_mat=np.eye(3))
-    assert "Give either the rotation vector or the rotation matrix" in str(excinfo.value)
-    
-    # Test when not enough information is given
-    with pytest.raises(Exception) as excinfo:
-        Transform()
-    assert "Couldn't create transform, not enough information given" in str(excinfo.value)
-
-
 def test_properties():
     """Test properties of Transform class"""
     # Create a transform with known values
     rot_mat = np.array([[0, -1, 0], [1, 0, 0], [0, 0, 1]])
     tvec = np.array([1.0, 2.0, 3.0])
-    transform = Transform(rot_mat=rot_mat, tvec=tvec)
+    transform = Transform.fromRotationMatrix(rot_mat=rot_mat, tvec=tvec)
     
     # Test rot_mat property
     assert np.array_equal(transform.rot_mat, rot_mat)
@@ -70,7 +58,7 @@ def test_rvec_property():
     """Test rvec property calculation when not provided during init"""
     # Create rotation matrix for 90 degrees around z-axis
     rot_mat = np.array([[0, -1, 0], [1, 0, 0], [0, 0, 1]])
-    transform = Transform(rot_mat=rot_mat, tvec=[0, 0, 0])
+    transform = Transform.fromRotationMatrix(rot_mat=rot_mat, tvec=[0, 0, 0])
     
     # Expected rvec for this rotation (approximation)
     # For 90 deg rotation around z-axis, expect something close to [0, 0, π/2]
@@ -85,7 +73,7 @@ def test_invert_property():
     # Create a transform
     rot_mat = np.array([[0, -1, 0], [1, 0, 0], [0, 0, 1]])
     tvec = np.array([1.0, 2.0, 3.0])
-    transform = Transform(rot_mat=rot_mat, tvec=tvec)
+    transform = Transform.fromRotationMatrix(rot_mat=rot_mat, tvec=tvec)
     
     # Get the inverse
     inverse = transform.invert
@@ -106,7 +94,7 @@ def test_apply_method():
     # Create a simple transform (90-degree rotation around Z + translation)
     rot_mat = np.array([[0, -1, 0], [1, 0, 0], [0, 0, 1]])
     tvec = np.array([1.0, 2.0, 3.0])
-    transform = Transform(rot_mat=rot_mat, tvec=tvec)
+    transform = Transform.fromRotationMatrix(rot_mat=rot_mat, tvec=tvec)
     
     # Apply to a point
     point = np.array([1.0, 0.0, 0.0])
@@ -120,8 +108,12 @@ def test_apply_method():
 def test_combine_method():
     """Test the combine method"""
     # Create two transformations
-    t1 = Transform(rot_mat=np.array([[0, -1, 0], [1, 0, 0], [0, 0, 1]]), tvec=np.array([1, 2, 3]))
-    t2 = Transform(rot_mat=np.array([[0, 0, 1], [0, 1, 0], [-1, 0, 0]]), tvec=np.array([4, 5, 6]))
+    t1 = Transform.fromRotationMatrix(
+        rot_mat=np.array([[0, -1, 0], [1, 0, 0], [0, 0, 1]]), tvec=np.array([1, 2, 3])
+    )
+    t2 = Transform.fromRotationMatrix(
+        rot_mat=np.array([[0, 0, 1], [0, 1, 0], [-1, 0, 0]]), tvec=np.array([4, 5, 6])
+    )
     
     # Combine them
     combined = t1.combine(t2)
@@ -140,7 +132,7 @@ def test_combine_method():
 def test_rotation_transform_correctness():
     """Test correctness of rotation transforms with well-known rotations"""
     # Test rotation around X axis by 90 degrees
-    rx90 = Transform(
+    rx90 = Transform.fromRotationMatrix(
         rot_mat=np.array([[1, 0, 0], [0, 0, -1], [0, 1, 0]]), tvec=[0, 0, 0]
     )
 
@@ -149,7 +141,7 @@ def test_rotation_transform_correctness():
     assert np.allclose(transformed_point, [1, -3, 2])
 
     # Test rotation around Y axis by 90 degrees
-    ry90 = Transform(
+    ry90 = Transform.fromRotationMatrix(
         rot_mat=np.array([[0, 0, 1], [0, 1, 0], [-1, 0, 0]]), tvec=[0, 0, 0]
     )
 
@@ -157,7 +149,7 @@ def test_rotation_transform_correctness():
     assert np.allclose(transformed_point, [3, 2, -1])
 
     # Test rotation around Z axis by 90 degrees
-    rz90 = Transform(
+    rz90 = Transform.fromRotationMatrix(
         rot_mat=np.array([[0, -1, 0], [1, 0, 0], [0, 0, 1]]), tvec=[0, 0, 0]
     )
 
@@ -171,11 +163,11 @@ def test_transformation_chain_correctness():
     point = np.array([1, 1, 1])
 
     # Create transformations - rotation + translation
-    t1 = Transform(
+    t1 = Transform.fromRotationMatrix(
         rot_mat=np.array([[0, -1, 0], [1, 0, 0], [0, 0, 1]]), tvec=[5, 0, 0]
     )  # 90° Z rotation + X translation
 
-    t2 = Transform(
+    t2 = Transform.fromRotationMatrix(
         rot_mat=np.array([[1, 0, 0], [0, 0, -1], [0, 1, 0]]), tvec=[0, 3, 0]
     )  # 90° X rotation + Y translation
 
@@ -204,7 +196,7 @@ def test_inverse_transformation_correctness():
     rot = np.array([0.3, -0.5, 0.7])  # Arbitrary rotation vector
     tvec = np.array([4.2, -1.3, 2.8])  # Arbitrary translation
 
-    transform = Transform(rvec=rot, tvec=tvec)
+    transform = Transform.fromRodrigues(rvec=rot, tvec=tvec)
     inverse = transform.invert
 
     # Test each point
@@ -222,7 +214,7 @@ def test_quaternion_representation():
     # Create a simple rotation - 180 degrees around Y axis
     # This should give a quaternion of (0, 0, 1, 0) in scalar-first format
     rot_mat = np.array([[-1, 0, 0], [0, 1, 0], [0, 0, -1]])
-    transform = Transform(rot_mat=rot_mat, tvec=[0, 0, 0])
+    transform = Transform.fromRotationMatrix(rot_mat=rot_mat, tvec=[0, 0, 0])
 
     # Check quaternion (scalar-first format)
     expected_quat = np.array([0, 0, 1, 0])
@@ -231,7 +223,7 @@ def test_quaternion_representation():
     # Create another rotation - 90 degrees around Z axis
     # Quaternion should be approximately (sqrt(2)/2, 0, 0, sqrt(2)/2) in scalar-first format
     rot_mat = np.array([[0, -1, 0], [1, 0, 0], [0, 0, 1]])
-    transform = Transform(rot_mat=rot_mat, tvec=[0, 0, 0])
+    transform = Transform.fromRotationMatrix(rot_mat=rot_mat, tvec=[0, 0, 0])
 
     expected_quat = np.array([np.sqrt(2) / 2, 0, 0, np.sqrt(2) / 2])
     assert np.allclose(transform.quat, expected_quat)

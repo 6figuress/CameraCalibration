@@ -185,7 +185,7 @@ def locateAruco(
     rvec = rvecs[0][0]  # Extract the rotation vector
     tvec = tvecs[0][0]  # Extract the translation vector
 
-    currTransf = Transform.getFromRodrigues(rvec=rvec, tvec=tvec)
+    currTransf = Transform.fromRodrigues(rvec=rvec, tvec=tvec)
 
     corners = Aruco.getCornersFromTopLeft(
         np.array([-aruco.size / 2, -aruco.size / 2, 0]), aruco.size
