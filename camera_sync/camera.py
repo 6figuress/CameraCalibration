@@ -220,7 +220,7 @@ class Camera:
     def updateWorldPosition(
         self, rvec: Vec3f, tvec: Vec3f, noLowPassFilter: bool = True
     ) -> tuple[Vec3f, MatLike]:
-        self.world2cam = Transform.getFromRodrigues(rvec=rvec, tvec=tvec)
+        self.world2cam = Transform.fromRodrigues(rvec=rvec, tvec=tvec)
 
         self.world_position.updatePos(
             self.world2cam.invert.apply([0.0, 0.0, 0.0]), noFilter=noLowPassFilter

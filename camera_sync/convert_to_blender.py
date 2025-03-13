@@ -23,7 +23,7 @@ def renderFromCamera(
 
     base_transf = camera.world2cam.invert
 
-    cam_blender = Transform.getFromRotationMatrix(
+    cam_blender = Transform.fromRotationMatrix(
         tvec=base_transf.tvec * 0.001, rot_mat=base_transf.rot_mat
     )
 

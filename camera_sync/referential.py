@@ -9,9 +9,10 @@ class Transform:
     _transf_mat: MatLike = None
     _rvec: Vec3f = None
     _inv: Self = None
+    _quat: Vec4f = None
 
     @staticmethod
-    def getFromRotationMatrix(rot_mat: MatLike, tvec: Vec3f) -> Self:
+    def fromRotationMatrix(rot_mat: MatLike, tvec: Vec3f) -> Self:
         """
         Create a transformation from a rotation matrix and a translation vector
 
@@ -22,6 +23,8 @@ class Transform:
             Transform: The transformation
         """
 
+        tvec = np.array(tvec).flatten()
+
         transf_mat = np.eye(4)
 
         transf_mat[:3, :3] = rot_mat
@@ -30,7 +33,7 @@ class Transform:
         return Transform(transf_mat=transf_mat)
 
     @staticmethod
-    def getFromQuaternion(quat: Vec4f, tvec: Vec3f, scalar_first=True) -> Self:
+    def fromQuaternion(quat: Vec4f, tvec: Vec3f, scalar_first=True) -> Self:
         """
         Creates a Transform object from a quaternion and translation vector.
 
@@ -50,10 +53,10 @@ class Transform:
 
         rot_mat = R.from_quat(quat, scalar_first=scalar_first).as_matrix()
 
-        return Transform.getFromRotationMatrix(rot_mat=rot_mat, tvec=tvec)
+        return Transform.fromRotationMatrix(rot_mat=rot_mat, tvec=tvec)
 
     @staticmethod
-    def getFromRodrigues(rvec: Vec3f, tvec: Vec3f) -> Self:
+    def fromRodrigues(rvec: Vec3f, tvec: Vec3f) -> Self:
         """
         Create a transformation from a Rodrigues vector and a translation vector
 
@@ -64,9 +67,9 @@ class Transform:
             Transform: The transformation
         """
 
-        rot_mat, _ = cv.Rodrigues(rvec)
+        rot_mat = cv.Rodrigues(np.array(rvec).flatten())[0]
 
-        return Transform.getFromRotationMatrix(rot_mat=rot_mat, tvec=tvec)
+        return Transform.fromRotationMatrix(rot_mat=rot_mat, tvec=tvec)
 
     def __init__(self, transf_mat: MatLike = None):
         """
@@ -77,7 +80,7 @@ class Transform:
         self._preCompute()
 
     def _preCompute(self):
-        self._rvec = cv.Rodrigues(self.rot_mat)[0]
+        self._rvec = cv.Rodrigues(self.rot_mat)[0].flatten()
         self._quat = R.from_matrix(self.rot_mat).as_quat(scalar_first=True)
 
     @property
@@ -86,6 +89,8 @@ class Transform:
 
     @property
     def quat(self) -> Vec4f:
+        if self._quat is None:
+            self._quat = R.from_matrix(self.rot_mat).as_quat(scalar_first=True)
         return self._quat
 
     @property
@@ -94,8 +99,6 @@ class Transform:
 
     @property
     def rvec(self) -> Vec3f:
-        if self._rvec is None:
-            self._rvec, _ = cv.Rodrigues(self.rot_mat)
         return self._rvec
 
     @property
@@ -111,7 +114,7 @@ class Transform:
             Transform: A new transformation that is the inverse of this one
         """
         if self._inv is None:
-            self._inv = Transform.getFromRotationMatrix(
+            self._inv = Transform.fromRotationMatrix(
                 rot_mat=self.rot_mat.T, tvec=-self.rot_mat.T @ self.tvec
             )
         return self._inv
