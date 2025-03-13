@@ -5,13 +5,12 @@ from .aruco import Aruco
 from .referential import Transform
 
 
-def vizPoses(poses: list[Transform], limits=(-500, 500)):
+def vizPoses(poses: list[Transform], limits=(-500, 500), length=100):
     # Create a 3D plot
     fig = plt.figure()
     ax = fig.add_subplot(111, projection="3d")
 
     def drawAxes(ax, transform: Transform, alpha=1.0):
-        length = 100
 
         directions = [
             [length, 0, 0],  # X-axis
