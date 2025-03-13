@@ -23,7 +23,9 @@ def renderFromCamera(
 
     base_transf = camera.world2cam.invert
 
-    cam_blender = Transform(tvec=base_transf.tvec * 0.001, rot_mat=base_transf.rot_mat)
+    cam_blender = Transform.getFromRotationMatrix(
+        tvec=base_transf.tvec * 0.001, rot_mat=base_transf.rot_mat
+    )
 
     cam_pose = cam_blender.apply(np.array([0, 0, 0]))
 

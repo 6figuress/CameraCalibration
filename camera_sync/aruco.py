@@ -185,7 +185,7 @@ def locateAruco(
     rvec = rvecs[0][0]  # Extract the rotation vector
     tvec = tvecs[0][0]  # Extract the translation vector
 
-    currTransf = Transform(rvec=rvec, tvec=tvec)
+    currTransf = Transform.getFromRodrigues(rvec=rvec, tvec=tvec)
 
     corners = Aruco.getCornersFromTopLeft(
         np.array([-aruco.size / 2, -aruco.size / 2, 0]), aruco.size
@@ -305,9 +305,9 @@ def PnP(image_points, object_points, mtx, dist, getMetrics=False) -> tuple[list,
 
             distances = np.linalg.norm(projected - image_points, axis=1)
 
-            metrics["AAE"] = np.mean(np.abs(distances))
+            metrics["MAE"] = np.mean(np.abs(distances))
 
-            metrics["RSE"] = np.sqrt(np.mean(distances**2))
+            metrics["RMSE"] = np.sqrt(np.mean(distances**2))
 
         return rvec, tvec, metrics
     else:
@@ -371,3 +371,7 @@ def processArucoFromMultipleCameras(
             average_positions = np.mean(arucosPositions[a.id], axis=0)
             for i, newPos in enumerate(average_positions):
                 a.corners[i].updatePos(newPos)
+
+
+if __name__ == "__main__":
+    pass

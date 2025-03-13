@@ -10,42 +10,70 @@ class Transform:
     _rvec: Vec3f = None
     _inv: Self = None
 
-    def __init__(
-        self,
-        transf_mat: MatLike = None,
-        rvec: Vec3f = None,
-        tvec: Vec3f = None,
-        rot_mat: MatLike = None,
-    ):
+    @staticmethod
+    def getFromRotationMatrix(rot_mat: MatLike, tvec: Vec3f) -> Self:
+        """
+        Create a transformation from a rotation matrix and a translation vector
+
+        Parameters:
+            rot_mat: The rotation matrix
+            tvec: The translation vector
+        Returns:
+            Transform: The transformation
+        """
+
+        transf_mat = np.eye(4)
+
+        transf_mat[:3, :3] = rot_mat
+        transf_mat[:3, 3] = tvec
+
+        return Transform(transf_mat=transf_mat)
+
+    @staticmethod
+    def getFromQuaternion(quat: Vec4f, tvec: Vec3f, scalar_first=True) -> Self:
+        """
+        Creates a Transform object from a quaternion and translation vector.
+
+        Parameters:
+            quat :
+                The quaternion representing rotation. If scalar_first is True, the format is [w, x, y, z],
+                otherwise [x, y, z, w].
+            tvec :
+                The translation vector [x, y, z].
+            scalar_first:
+                Whether the quaternion has the scalar component first.
+        Returns:
+        --------
+        Self
+            A new Transform object representing the specified transformation.
+        """
+
+        rot_mat = R.from_quat(quat, scalar_first=scalar_first).as_matrix()
+
+        return Transform.getFromRotationMatrix(rot_mat=rot_mat, tvec=tvec)
+
+    @staticmethod
+    def getFromRodrigues(rvec: Vec3f, tvec: Vec3f) -> Self:
+        """
+        Create a transformation from a Rodrigues vector and a translation vector
+
+        Parameters:
+            rvec: The Rodrigues vector
+            tvec: The translation vector
+        Returns:
+            Transform: The transformation
+        """
+
+        rot_mat, _ = cv.Rodrigues(rvec)
+
+        return Transform.getFromRotationMatrix(rot_mat=rot_mat, tvec=tvec)
+
+    def __init__(self, transf_mat: MatLike = None):
         """
         Parameters:
             transf_mat: The complete transformation matrix
-            rvec: A compressed Rodrigues vector
-            tvec: A translation vect
-            rot_mat: A rotation matrix (3x3)
-
-        ## Notes:
-            You need to give either :
-            - The transformation matrix
-            - The translation and rotation vector
-            - The translation vector and rotation matrix
         """
-        if rvec is not None:
-            if rot_mat is not None:
-                raise Exception(
-                    "Give either the rotation vector or the rotation matrix, but not both"
-                )
-            self._rvec = rvec
-            rot_mat, _ = cv.Rodrigues(np.array(rvec))
-
-        if tvec is not None and rot_mat is not None:
-            self._transf_mat = np.eye(4)
-            self._transf_mat[:3, :3] = np.array(rot_mat)
-            self._transf_mat[:3, 3] = np.array(tvec).ravel()
-        elif transf_mat is not None:
-            self._transf_mat = transf_mat
-        else:
-            raise Exception("Couldn't create transform, not enough information given.")
+        self._transf_mat = transf_mat
         self._preCompute()
 
     def _preCompute(self):
@@ -83,7 +111,7 @@ class Transform:
             Transform: A new transformation that is the inverse of this one
         """
         if self._inv is None:
-            self._inv = Transform(
+            self._inv = Transform.getFromRotationMatrix(
                 rot_mat=self.rot_mat.T, tvec=-self.rot_mat.T @ self.tvec
             )
         return self._inv

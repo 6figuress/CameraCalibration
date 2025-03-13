@@ -35,7 +35,9 @@ def vizPoses(poses: list[Transform], limits=(-500, 500), length=100):
             )
 
     # Draw the base axis
-    drawAxes(ax, Transform(rvec=[0.0, 0.0, 0.0], tvec=[0.0, 0.0, 0.0]), 0.3)
+    drawAxes(
+        ax, Transform.getFromRodrigues(rvec=[0.0, 0.0, 0.0], tvec=[0.0, 0.0, 0.0]), 0.3
+    )
 
     # Iterate over each pair of rvec and tvec
     for t in poses:
