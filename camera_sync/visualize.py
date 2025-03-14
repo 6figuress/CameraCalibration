@@ -80,9 +80,12 @@ def initVisualization(
         lambda x: vis.add_geometry(x),
     )
 
+    render_option = vis.get_render_option()
+    render_option.mesh_show_back_face = True
+
     ctl = vis.get_view_control()
     ctl.set_constant_z_far(1000000)
-    ctl.camera_local_translate(forward=-500, right=40, up=80)
+    ctl.camera_local_translate(forward=-1000, right=40, up=-80)
 
     return vis, baseMarkersMeshes, movingMarkersMeshes, camerasCube
 
@@ -140,8 +143,8 @@ if __name__ == "__main__":
         Camera(
             "Logitec_A",
             2,
-            focus=0,
-            resolution=(1280, 720),
+            focus=10,
+            resolution=(640, 480),
         ),
         # Camera(
         #     "Logitec_B",

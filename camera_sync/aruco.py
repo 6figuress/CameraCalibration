@@ -47,31 +47,52 @@ class Aruco:
                 self.corners[1].coords,
                 self.corners[2].coords,
                 self.corners[3].coords,
-            ]
+            ],
+            dtype=np.float32,
         )        
 
 
     def getCenter(self) -> Position:
         return Position(
             self.corners[0].x + self.size / 2,
-            self.corners[0].y + self.size / 2,
+            self.corners[0].y - self.size / 2,
             self.corners[0].z,
         )
 
 
-def getArucosFromPaper() -> dict[int, Aruco]:
-    return {
-        1: Aruco(1, size=27, topLeft=Position(0, 0, 0)),
-        2: Aruco(2, size=27, topLeft=Position(0, 0, 0)),
-        3: Aruco(3, size=27, topLeft=Position(0, 0, 0)),
-        0: Aruco(0, size=27, topLeft=Position(0, 0, 0)),
-        10: Aruco(10, size=80, topLeft=Position(0, 0, 0)),
-        11: Aruco(11, size=80, topLeft=Position(110, 0, 0)),
-        12: Aruco(12, size=80, topLeft=Position(0, -95, 0)),
-        13: Aruco(13, size=80, topLeft=Position(110, -95, 0)),
-        14: Aruco(14, size=80, topLeft=Position(0, -190, 0)),
-        15: Aruco(15, size=80, topLeft=Position(110, -190, 0)),
-    }
+def getArucosFromPaper(pap_v: int = 1) -> dict[int, Aruco]:
+    dic = {}
+
+    if pap_v == 1:
+        dic = {
+            1: Aruco(1, size=27, topLeft=Position(0, 0, 0)),
+            2: Aruco(2, size=27, topLeft=Position(0, 0, 0)),
+            3: Aruco(3, size=27, topLeft=Position(0, 0, 0)),
+            0: Aruco(0, size=27, topLeft=Position(0, 0, 0)),
+            10: Aruco(10, size=80, topLeft=Position(0, 0, 0)),
+            11: Aruco(11, size=80, topLeft=Position(110, 0, 0)),
+            12: Aruco(12, size=80, topLeft=Position(0, -95, 0)),
+            13: Aruco(13, size=80, topLeft=Position(110, -95, 0)),
+            14: Aruco(14, size=80, topLeft=Position(0, -190, 0)),
+            15: Aruco(15, size=80, topLeft=Position(110, -190, 0)),
+        }
+    elif pap_v == 2:
+        x_start = 0
+        y_start = 0
+        id = 20
+        x_step = 35
+        y_step = -35
+        size = 30
+        for i in range(0, 5):
+            for j in range(0, 5):
+                dic[id] = Aruco(
+                    id,
+                    size=size,
+                    topLeft=Position(x_start + j * x_step, y_start + i * y_step, 0),
+                )
+                id += 1
+
+    return dic
 
 
 def generate_aruco_marker(
@@ -159,6 +180,11 @@ def detectAruco(
         detector = cv.aruco.ArucoDetector(arucoDict, arucoParams)
         (corners, ids, rejected) = detector.detectMarkers(gray)
 
+        # cv.aruco.drawDetectedMarkers(img, corners, ids)
+
+        # cv.imshow("frame", img)
+        # cv.waitKey(0)
+
     if ids is None:
         if debug:
             print("No markers found")
@@ -188,7 +214,7 @@ def locateAruco(
     currTransf = Transform.fromRodrigues(rvec=rvec, tvec=tvec)
 
     corners = Aruco.getCornersFromTopLeft(
-        np.array([-aruco.size / 2, -aruco.size / 2, 0]), aruco.size
+        np.array([-aruco.size / 2, aruco.size / 2, 0]), aruco.size
     )
 
     world_corners = []
@@ -242,7 +268,7 @@ def processAruco(
     if metrics:
         metrics_collected["PnP"] = met
 
-    camera.updateWorldPosition(rvec, tvec)
+    camera.updateWorldPosition(rvec, tvec, noLowPassFilter=False)
 
     arucosPosition: dict[int, np.ndarray[np.ndarray[float]]] = {}
 
@@ -374,6 +400,7 @@ def processArucoFromMultipleCameras(
 
 
 if __name__ == "__main__":
-    for i in range(20, 48):
-        generate_aruco_marker(i)
+    getArucosFromPaper()
+    # for i in range(20, 48):
+    #     generate_aruco_marker(i)
     pass

@@ -61,7 +61,6 @@ class Camera:
         ret, mtx, dist, rvecs, tvecs = cv.calibrateCamera(
             objpoints, imgpoints, gray.shape[::-1], None, None
         )
-
         def evaluateCalibration():
             mean_error = 0
             for i in range(len(objpoints)):
@@ -184,7 +183,7 @@ class Camera:
             elif key == ord("c"):
                 frames.append(frame)
                 print("Frame added to calibration")
-                self.calibrate(frames, pointsToFind)
+                self.calibrateCamera(frames, pointsToFind)
 
     def saveCalibration(self):
         """
@@ -252,6 +251,6 @@ class Camera:
         return dst
 
 if __name__ == "__main__":
-    camera = Camera("Logitec_A", 0, focus=0, resolution=(1280, 720))
+    camera = Camera("Logitec_A", 2, focus=10, resolution=(640, 480))
     camera.calibrateWithLiveFeed()
     cv.destroyAllWindows()

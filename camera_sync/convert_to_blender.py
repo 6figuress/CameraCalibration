@@ -139,16 +139,15 @@ def apply_distortion(cam: Camera) -> None:
     links.new(movie_distortion.outputs["Image"], composite.inputs["Image"])
 
 
+if __name__ == "__main__":
+    logi_a = Camera("Logitec_A", 2, focus=0, resolution=(1280, 720))
 
-logi_a = Camera("Logitec_A", 2, focus=0, resolution=(1280, 720))
+    sleep(1)
 
-sleep(1)
+    frame = logi_a.takePic()
 
-frame = logi_a.takePic()
+    cv.imwrite(os.path.join(BLENDER_FOLDER, "base.png"), frame)
 
-cv.imwrite(os.path.join(BLENDER_FOLDER, "base.png"), frame)
+    rvec, tvec, _, _ = processAruco(arucos.values(), [], logi_a, frame)
 
-
-rvec, tvec, _, _ = processAruco(arucos.values(), [], logi_a, frame)
-
-renderFromCamera(logi_a)
+    renderFromCamera(logi_a)
