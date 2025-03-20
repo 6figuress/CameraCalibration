@@ -171,9 +171,15 @@ def detectAruco(
     arucoParams.cornerRefinementMinAccuracy = 0.01
     arucoParams.cornerRefinementMaxIterations = 100
 
-    (corners, ids, rejected) = cv.aruco.detectMarkers(
-        gray, arucoDict, parameters=arucoParams
-    )
+    if hasattr(cv.aruco, "detectMarkers"):
+        (corners, ids, rejected) = cv.aruco.detectMarkers(
+            gray, arucoDict, parameters=arucoParams
+        )
+
+    else:
+        detector = cv.aruco.ArucoDetector(arucoDict, arucoParams)
+
+        (corners, ids, rejected) = detector.detectMarkers(gray)
     # cv.aruco.drawDetectedMarkers(img, corners, ids)
 
     # cv.imshow("frame", img)
