@@ -92,6 +92,12 @@ def getArucosFromPaper(pap_v: int = 1) -> dict[int, Aruco]:
                 )
                 id += 1
 
+    elif pap_v == 3:
+        dic[44] = Aruco(44, size=85, topLeft=Position(0, 0, 0))
+        dic[45] = Aruco(45, size=85, topLeft=Position(150.4, 0, 0))
+        dic[46] = Aruco(46, size=85, topLeft=Position(0, -67.5, 0))
+        dic[47] = Aruco(47, size=85, topLeft=Position(150.4, -67.5, 0))
+
     return dic
 
 
