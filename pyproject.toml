@@ -11,5 +11,13 @@ dependencies = [
     "open3d>=0.19.0",
     "opencv-contrib-python>=4.11.0.86",
     "opencv-python>=4.11.0.86",
+    "pytest>=8.3.5",
     "scipy>=1.15.2",
+]
+
+[dependency-groups]
+dev = [
+    "ipdb>=0.13.13",
+    "pytest>=8.3.5",
+    "pytest-cov>=6.0.0",
 ]
