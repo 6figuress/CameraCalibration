@@ -1,3 +1,5 @@
+[![codecov](https://codecov.io/gh/6figuress/CameraCalibration/branch/main/graph/badge.svg?token=W25GRHWTS0)](https://codecov.io/gh/6figuress/CameraCalibration)
+
 # Camera syncronization
 
 This repository is used to calibrate a camera, and then use it to locate itself from aruco markers used as "anchors". And then located other aruco marker in a defined 3d coordinate space
