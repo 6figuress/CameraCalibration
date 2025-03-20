@@ -1,4 +1,5 @@
 [![codecov](https://codecov.io/gh/6figuress/CameraCalibration/branch/main/graph/badge.svg?token=W25GRHWTS0)](https://codecov.io/gh/6figuress/CameraCalibration)
+![Test status](https://github.com/6figuress/CameraCalibration/actions/workflows/main.yml/badge.svg)
 
 # Camera syncronization
 
