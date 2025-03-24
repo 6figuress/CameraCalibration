@@ -93,10 +93,10 @@ def getArucosFromPaper(pap_v: int = 1) -> dict[int, Aruco]:
                 id += 1
 
     elif pap_v == 3:
-        dic[44] = Aruco(44, size=85, topLeft=Position(0, 0, 0))
-        dic[45] = Aruco(45, size=85, topLeft=Position(150.4, 0, 0))
-        dic[46] = Aruco(46, size=85, topLeft=Position(0, -67.5, 0))
-        dic[47] = Aruco(47, size=85, topLeft=Position(150.4, -67.5, 0))
+        dic[44] = Aruco(44, size=77, topLeft=Position(0, 0, 0))
+        dic[45] = Aruco(45, size=77, topLeft=Position(150.4, 0, 0))
+        dic[46] = Aruco(46, size=77, topLeft=Position(0, -220, 0))
+        dic[47] = Aruco(47, size=77, topLeft=Position(150.4, -220, 0))
 
     return dic
 
@@ -186,11 +186,6 @@ def detectAruco(
         detector = cv.aruco.ArucoDetector(arucoDict, arucoParams)
 
         (corners, ids, rejected) = detector.detectMarkers(gray)
-    # cv.aruco.drawDetectedMarkers(img, corners, ids)
-
-    # cv.imshow("frame", img)
-    # cv.waitKey(0)
-
     if ids is None:
         if debug:
             print("No markers found")
