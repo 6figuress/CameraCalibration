@@ -91,7 +91,24 @@ def getArucosFromPaper(pap_v: int = 1) -> dict[int, Aruco]:
                     topLeft=Position(x_start + j * x_step, y_start + i * y_step, 0),
                 )
                 id += 1
-
+    elif pap_v == 4:
+        positions = [
+            (0, 0),  # Top left corner
+            (150.14, 0),  # Top right corner
+            (0, -220.14),  # Bottom left corner
+            (150.14, -220.14),  # Bottom right corner
+        ]
+        id = 32
+        x_step = 40
+        y_step = 40
+        for x_start, y_start in positions:
+            for i in range(0, 2):
+                for j in range(0, 2):
+                    x = x_start + j * x_step
+                    y = y_start + i * y_step
+                    dic[id] = Aruco(id, size=35, topLeft=Position(x=x, y=y, z=0))
+                    id += 1
+                    pass
     elif pap_v == 3:
         dic[44] = Aruco(44, size=77, topLeft=Position(0, 0, 0))
         dic[45] = Aruco(45, size=77, topLeft=Position(150.4, 0, 0))
