@@ -100,7 +100,7 @@ def getArucosFromPaper(pap_v: int = 1) -> dict[int, Aruco]:
         ]
         id = 32
         x_step = 40
-        y_step = 40
+        y_step = -40
         for x_start, y_start in positions:
             for i in range(0, 2):
                 for j in range(0, 2):
