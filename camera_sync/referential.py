@@ -106,6 +106,10 @@ class Transform:
         return self.transf_mat[:3, 3]
 
     @property
+    def kine_pose(self):
+        return np.array([*self.tvec, self.quat[3], *self.quat[:3]])
+
+    @property
     def invert(self) -> Self:
         """
         Invert a transformation
