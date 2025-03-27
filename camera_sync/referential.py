@@ -107,7 +107,8 @@ class Transform:
 
     @property
     def kine_pose(self):
-        return np.array([*self.tvec, self.quat[3], *self.quat[:3]])
+        temp = np.roll(self.quat, -1)
+        return np.array([*self.tvec, *temp])
 
     @property
     def invert(self) -> Self:
