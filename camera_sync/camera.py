@@ -251,6 +251,6 @@ class Camera:
         return dst
 
 if __name__ == "__main__":
-    camera = Camera("Logitec_robot", 0, focus=10, resolution=(1920, 1080))
+    camera = Camera("Logitec_robot", 2, focus=10, resolution=(1920, 1080))
     camera.calibrateWithLiveFeed()
     cv.destroyAllWindows()

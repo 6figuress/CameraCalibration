@@ -107,8 +107,14 @@ class Transform:
 
     @property
     def kine_pose(self):
+        """
+        Return the current transformation into a format compatible with the inverse kinematics
+
+        Returns:
+            np.array: The transformation in the format [x, y, z, w, x, y, z] with units : [m, m, m, rad, rad, rad]
+        """
         temp = np.roll(self.quat, -1)
-        return np.array([*self.tvec, *temp])
+        return np.array([*self.tvec / 100, *temp])
 
     @property
     def invert(self) -> Self:
