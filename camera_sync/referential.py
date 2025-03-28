@@ -114,7 +114,7 @@ class Transform:
             np.array: The transformation in the format [x, y, z, w, x, y, z] with units : [m, m, m, rad, rad, rad]
         """
         temp = np.roll(self.quat, -1)
-        return np.array([*self.tvec / 100, *temp])
+        return np.array([*self.tvec / 1000, *temp])
 
     @property
     def invert(self) -> Self:
