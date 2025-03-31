@@ -217,7 +217,7 @@ def detectAruco(
 
 def locateAruco(
     aruco: Aruco, img_positions: list, camera: Camera, metrics: bool = False
-) -> tuple[list[Vec3f], dict[str, any]]:
+) -> tuple[list[Vec3f], Transform, dict[str, any]]:
     metrics = {}
 
     assert len(img_positions[0]) == 4
@@ -228,6 +228,10 @@ def locateAruco(
 
     rvec = rvecs[0][0]  # Extract the rotation vector
     tvec = tvecs[0][0]  # Extract the translation vector
+
+    arcuo2cam = Transform.fromRodrigues(rvec=rvec, tvec=tvec)
+
+    aruco2world = camera.world2cam.invert.combine(arcuo2cam)
 
     currTransf = Transform.fromRodrigues(rvec=rvec, tvec=tvec)
 
@@ -242,7 +246,7 @@ def locateAruco(
         pos = cam2world.apply(pos)
         world_corners.append(pos)
 
-    return world_corners, metrics
+    return world_corners, aruco2world, metrics
 
 
 def processAruco(
@@ -288,17 +292,19 @@ def processAruco(
 
     camera.updateWorldPosition(rvec, tvec, noLowPassFilter=False)
 
-    arucosPosition: dict[int, np.ndarray[np.ndarray[float]]] = {}
+    arucosPosition: dict[int, Transform] = {}
 
     for a in movingArucos:
         if corners_position.get(a.id) is None:
             continue
         else:
-            newCorners, ar_met = locateAruco(a, corners_position[a.id], camera)
+            newCorners, aruco2world, ar_met = locateAruco(
+                a, corners_position[a.id], camera
+            )
             if directUpdate:
                 for i, c in enumerate(newCorners):
                     a.corners[i].updatePos(c)
-            arucosPosition[a.id] = newCorners
+            arucosPosition[a.id] = aruco2world
 
     return rvec, tvec, arucosPosition, metrics_collected
 
@@ -384,7 +390,15 @@ def processArucoFromMultipleCameras(
         for key in ap.keys():
             if key not in arucosPositions:
                 arucosPositions[key] = []
-            arucosPositions[key].append(ap[key])
+
+            corners = Aruco.getCornersFromTopLeft(
+                np.array([-movingArucos[key].size / 2, movingArucos[key].size / 2, 0]),
+                movingArucos[key].size,
+            )
+            finalCorners = []
+            for c in corners:
+                finalCorners.append(ap[key].apply(c))
+            arucosPositions[key].append(finalCorners)
 
 
     for a in movingArucos:
