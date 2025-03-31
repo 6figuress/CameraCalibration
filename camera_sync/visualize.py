@@ -118,7 +118,7 @@ def locateCamera(
                 raise Exception("Aha ?")
             frames.append(frame)
         processArucoFromMultipleCameras(
-            fixedMarkers.values(), movingMarkers.values(), cameras, frames
+            fixedMarkers.values(), movingMarkers, cameras, frames
         )
 
         for m in movingMarkers.values():
@@ -141,10 +141,10 @@ def locateCamera(
 if __name__ == "__main__":
     cameras = [
         Camera(
-            "Logitec_robot",
-            0,
-            focus=10,
-            resolution=(1920, 1080),
+            "Logitec_A",
+            2,
+            focus=0,
+            resolution=(1280, 720),
         ),
         # Camera(
         #     "Logitec_B",
@@ -154,10 +154,10 @@ if __name__ == "__main__":
         # ),
     ]
 
-    arucos = getArucosFromPaper(3)
+    arucos = getArucosFromPaper(1)
 
-    achors = [44, 45, 46, 47]
-    moving = []
+    achors = [10, 11, 14, 15]
+    moving = [12, 13]
     fixedMarkers = {}
 
     movingMarkers = {}

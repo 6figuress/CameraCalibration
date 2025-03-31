@@ -27,6 +27,21 @@ class Aruco:
         bottomLeft[1] -= size
         return np.array([topLeft, topRight, bottomRight, bottomLeft])
 
+    @staticmethod
+    def getCornersFromPose(pose: Transform, size: float):
+        halfSize = size / 2
+        corners = [
+            [-halfSize, -halfSize, 0.0],
+            [halfSize, -halfSize, 0.0],
+            [halfSize, halfSize, 0.0],
+            [-halfSize, halfSize, 0.0],
+        ]
+        final = []
+        for c in corners:
+            final.append(pose.apply(c))
+
+        return final
+
     @property
     def isLocated(self) -> bool:
         return self.corners is not None
@@ -49,8 +64,12 @@ class Aruco:
                 self.corners[3].coords,
             ],
             dtype=np.float32,
-        )        
+        )
 
+    def updatePose(self, aruco2world: Transform):
+        newCorners = Aruco.getCornersFromPose(aruco2world, self.size)
+        self.corners = newCorners
+        pass
 
     def getCenter(self) -> Position:
         return Position(
@@ -58,6 +77,46 @@ class Aruco:
             self.corners[0].y - self.size / 2,
             self.corners[0].z,
         )
+
+
+def estimate_pose_single_markers(corners, marker_size, mtx, distortion):
+    """
+    Replacement for cv2.aruco.estimatePoseSingleMarkers
+
+    Parameters:
+        corners: List of detected marker corners
+        marker_size: Physical size of the marker in your desired unit (usually meters)
+        mtx: Camera calibration matrix
+        distortion: Camera distortion coefficients
+
+    Returns:
+        rvecs: List of rotation vectors
+        tvecs: List of translation vectors
+    """
+    # Define the marker points in 3D space at origin
+    marker_points = np.array(
+        [
+            [-marker_size / 2, marker_size / 2, 0],
+            [marker_size / 2, marker_size / 2, 0],
+            [marker_size / 2, -marker_size / 2, 0],
+            [-marker_size / 2, -marker_size / 2, 0],
+        ],
+        dtype=np.float32,
+    )
+
+    # Get 2D coordinates from the corner
+    corner_points = corners.astype(np.float32)
+
+    # Use solvePnP to get the rotation and translation vectors
+    success, rvec, tvec = cv.solvePnP(
+        marker_points,
+        corner_points,
+        mtx,
+        distortion,
+        flags=cv.SOLVEPNP_IPPE_SQUARE,
+    )
+
+    return rvec, tvec
 
 
 def getArucosFromPaper(pap_v: int = 1) -> dict[int, Aruco]:
@@ -217,36 +276,20 @@ def detectAruco(
 
 def locateAruco(
     aruco: Aruco, img_positions: list, camera: Camera, metrics: bool = False
-) -> tuple[list[Vec3f], Transform, dict[str, any]]:
+) -> tuple[Transform, dict[str, any]]:
     metrics = {}
 
     assert len(img_positions[0]) == 4
 
-    rvecs, tvecs, _ = cv.aruco.estimatePoseSingleMarkers(
+    rvec, tvec = estimate_pose_single_markers(
         img_positions, aruco.size, camera.mtx, camera.dist
     )
 
-    rvec = rvecs[0][0]  # Extract the rotation vector
-    tvec = tvecs[0][0]  # Extract the translation vector
-
     arcuo2cam = Transform.fromRodrigues(rvec=rvec, tvec=tvec)
 
-    aruco2world = camera.world2cam.invert.combine(arcuo2cam)
+    aruco2world = arcuo2cam.combine(camera.world2cam.invert)
 
-    currTransf = Transform.fromRodrigues(rvec=rvec, tvec=tvec)
-
-    corners = Aruco.getCornersFromTopLeft(
-        np.array([-aruco.size / 2, aruco.size / 2, 0]), aruco.size
-    )
-
-    world_corners = []
-    cam2world = camera.world2cam.invert
-    for i, c in enumerate(corners):
-        pos = currTransf.apply(c)
-        pos = cam2world.apply(pos)
-        world_corners.append(pos)
-
-    return world_corners, aruco2world, metrics
+    return aruco2world, metrics
 
 
 def processAruco(
@@ -298,12 +341,9 @@ def processAruco(
         if corners_position.get(a.id) is None:
             continue
         else:
-            newCorners, aruco2world, ar_met = locateAruco(
-                a, corners_position[a.id], camera
-            )
+            aruco2world, ar_met = locateAruco(a, corners_position[a.id], camera)
             if directUpdate:
-                for i, c in enumerate(newCorners):
-                    a.corners[i].updatePos(c)
+                a.updatePose(aruco2world)
             arucosPosition[a.id] = aruco2world
 
     return rvec, tvec, arucosPosition, metrics_collected
@@ -366,7 +406,7 @@ def PnP(image_points, object_points, mtx, dist, getMetrics=False) -> tuple[list,
 
 def processArucoFromMultipleCameras(
     fixedArucos: list[Aruco],
-    movingArucos: list[Aruco],
+    movingArucos: dict[int, Aruco],
     cameras: list[Camera],
     frame: list[list],
     getMetrics=False,
@@ -377,7 +417,7 @@ def processArucoFromMultipleCameras(
     for c, f in zip(cameras, frame):
         res = processAruco(
             fixedArucos,
-            movingArucos,
+            movingArucos.values(),
             c,
             f,
             accept_none=True,
@@ -400,8 +440,7 @@ def processArucoFromMultipleCameras(
                 finalCorners.append(ap[key].apply(c))
             arucosPositions[key].append(finalCorners)
 
-
-    for a in movingArucos:
+    for a in movingArucos.values():
         if a.id in arucosPositions:
             if getMetrics:
                 nbrDims = 3  # We're in 3d
