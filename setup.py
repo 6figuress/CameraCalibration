@@ -14,7 +14,7 @@ setup(
         "bpy",
         "numpy",
     ],
-    python_requires=">=3.10,<3.12",
+    python_requires=">=3.11,<3.12",
     author="6 Figures",
     description="A package to allow camera to localize aruco markers in a 3d world",
     package_data={
