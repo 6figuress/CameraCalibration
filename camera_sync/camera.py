@@ -120,6 +120,8 @@ class Camera:
         self._focus = focus
         self._resolution = resolution
 
+        self.calibrated = False
+
         if os.path.exists(self.calibrationFilePath):
             print(f"{self.name} : Found calibration file at {self.calibrationFilePath}")
             self._loadCalibration()
@@ -142,6 +144,7 @@ class Camera:
         file = np.load(self.calibrationFilePath)
         self.mtx = file["mtx"]
         self.dist = file["dist"]
+        self.calibrated = True
         return file["mtx"], file["dist"]
 
     def takePic(self):
@@ -213,6 +216,8 @@ class Camera:
 
         self.mtx = mtx
         self.dist = dist
+
+        self.calibrated = True
 
         return mtx, dist
 
